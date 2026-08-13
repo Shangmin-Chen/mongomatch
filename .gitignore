@@ -24,3 +24,4 @@ out/
 .vercel
 .env*
 !.env.example
+*.tsbuildinfo

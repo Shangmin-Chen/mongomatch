@@ -31,7 +31,12 @@ export async function GET(
       return NextResponse.json({ error: "Attendee not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ person: doc });
+    const [position, total] = await Promise.all([
+      collection.countDocuments({ createdAt: { $lte: doc.createdAt } }),
+      collection.countDocuments({}),
+    ]);
+
+    return NextResponse.json({ person: doc, position, total });
   } catch (error: any) {
     console.error("[api/person] Error fetching attendee:", error);
     return NextResponse.json({ error: error?.message || "Internal server error" }, { status: 500 });

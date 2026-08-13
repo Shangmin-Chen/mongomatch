@@ -51,6 +51,8 @@ export default function AttendeeDetailPage({
   const pathString = slug.join("/");
 
   const [person, setPerson] = useState<PersonDoc | null>(null);
+  const [position, setPosition] = useState<number | null>(null);
+  const [total, setTotal] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -67,6 +69,8 @@ export default function AttendeeDetailPage({
       if (res.ok) {
         const data = await res.json();
         setPerson(data.person);
+        setPosition(typeof data.position === "number" ? data.position : null);
+        setTotal(typeof data.total === "number" ? data.total : null);
         setNotFound(false);
       }
     } catch (err) {
@@ -159,6 +163,25 @@ export default function AttendeeDetailPage({
           </button>
         </div>
       </div>
+
+      {/* Join counter */}
+      {position !== null && total !== null && (
+        <div
+          style={{
+            textAlign: "center",
+            padding: "0.65rem",
+            marginBottom: "1.25rem",
+            background: "rgba(0, 237, 100, 0.08)",
+            border: "1px solid rgba(0, 237, 100, 0.25)",
+            borderRadius: "8px",
+            color: "#00ed64",
+            fontSize: "0.85rem",
+            fontWeight: 600,
+          }}
+        >
+          You&apos;re #{position} of {total} so far — reload later as more people join.
+        </div>
+      )}
 
       {/* Main Profile Card */}
       <div
