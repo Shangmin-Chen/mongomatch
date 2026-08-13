@@ -12,8 +12,18 @@ import {
   Cpu,
 } from "lucide-react";
 
+import dynamic from "next/dynamic";
 import heroFallbackData from "@/lib/hero-fallback.json";
-import KnowledgeGraph from "@/components/KnowledgeGraph";
+
+const KnowledgeGraph = dynamic(() => import("@/components/KnowledgeGraph"), {
+  ssr: false,
+  loading: () => (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", color: "#94a3b8", gap: "10px" }}>
+      <div className="spinner" style={{ width: "32px", height: "32px" }} />
+      <span style={{ fontSize: "14px", fontWeight: 600 }}>Loading Knowledge Graph...</span>
+    </div>
+  ),
+});
 
 interface CandidateDoc {
   handle: string;

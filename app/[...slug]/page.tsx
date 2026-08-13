@@ -20,7 +20,16 @@ import {
   Network,
 } from "lucide-react";
 
-import KnowledgeGraph from "@/components/KnowledgeGraph";
+import dynamic from "next/dynamic";
+
+const KnowledgeGraph = dynamic(() => import("@/components/KnowledgeGraph"), {
+  ssr: false,
+  loading: () => (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "#94a3b8" }}>
+      <div className="spinner" style={{ width: "24px", height: "24px", marginRight: "8px" }} /> Loading Knowledge Graph...
+    </div>
+  ),
+});
 
 interface RepoDoc {
   name: string;
