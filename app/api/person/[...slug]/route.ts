@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/mongodb";
+import { findMatches } from "@/lib/match.js";
 
 export async function GET(
   req: NextRequest,
@@ -18,7 +19,7 @@ export async function GET(
     const collection = db.collection("people");
 
     // Search by exact handle (e.g. "owner/repo" or "owner")
-    let doc = await collection.findOne({
+    const doc = await collection.findOne({
       $or: [
         { handle: pathString },
         { handle: primaryHandle },
@@ -36,7 +37,20 @@ export async function GET(
       collection.countDocuments({}),
     ]);
 
-    return NextResponse.json({ person: doc, position, total });
+    let matches: any[] = [];
+    let degraded = false;
+
+    if (doc.enriched) {
+      try {
+        const matchRes = await findMatches(doc.handle, { limit: 3 });
+        matches = matchRes.matches || [];
+        degraded = matchRes.degraded || false;
+      } catch (matchErr) {
+        console.error("[api/person] findMatches error:", matchErr);
+      }
+    }
+
+    return NextResponse.json({ person: doc, position, total, matches, degraded });
   } catch (error: any) {
     console.error("[api/person] Error fetching attendee:", error);
     return NextResponse.json({ error: error?.message || "Internal server error" }, { status: 500 });

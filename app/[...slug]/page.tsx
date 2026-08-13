@@ -14,7 +14,31 @@ import {
   Mail,
   User,
   GitBranch,
+  UserCheck,
+  Star,
 } from "lucide-react";
+
+interface RepoDoc {
+  name: string;
+  url: string;
+  description: string;
+  language: string | null;
+  topics: string[];
+  stars: number;
+  pushedAt: string;
+}
+
+interface MatchDoc {
+  handle: string;
+  name: string;
+  email: string;
+  githubUrl?: string;
+  sharedTags: string[];
+  reason: string;
+  evidenceRepo?: RepoDoc | null;
+  path?: any[];
+  score?: number;
+}
 
 interface PersonDoc {
   _id: string;
@@ -28,15 +52,7 @@ interface PersonDoc {
   enrichedAt?: string;
   enrichError?: string;
   tags?: string[];
-  repos?: {
-    name: string;
-    url: string;
-    description: string;
-    language: string | null;
-    topics: string[];
-    stars: number;
-    pushedAt: string;
-  }[];
+  repos?: RepoDoc[];
   createdAt?: string;
   updatedAt?: string;
 }
@@ -53,6 +69,7 @@ export default function AttendeeDetailPage({
   const [person, setPerson] = useState<PersonDoc | null>(null);
   const [position, setPosition] = useState<number | null>(null);
   const [total, setTotal] = useState<number | null>(null);
+  const [matches, setMatches] = useState<MatchDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -71,6 +88,7 @@ export default function AttendeeDetailPage({
         setPerson(data.person);
         setPosition(typeof data.position === "number" ? data.position : null);
         setTotal(typeof data.total === "number" ? data.total : null);
+        setMatches(Array.isArray(data.matches) ? data.matches : []);
         setNotFound(false);
       }
     } catch (err) {
@@ -121,8 +139,8 @@ export default function AttendeeDetailPage({
     <main className="wrapper" style={{ maxWidth: "560px" }}>
       {/* Top action bar */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem" }}>
-        <Link href="/form" style={{ color: "#9ca3af", fontSize: "0.85rem", display: "flex", alignItems: "center", gap: "0.3rem" }}>
-          <ArrowLeft size={14} /> Back to Form
+        <Link href="/" style={{ color: "#9ca3af", fontSize: "0.85rem", display: "flex", alignItems: "center", gap: "0.3rem" }}>
+          <ArrowLeft size={14} /> Back to Home
         </Link>
         <div style={{ display: "flex", gap: "0.5rem" }}>
           <button
@@ -260,6 +278,127 @@ export default function AttendeeDetailPage({
             {person.description}
           </div>
         </div>
+      </div>
+
+      {/* TOP UNBLOCKER MATCHES SECTION (PLAN_4) */}
+      <div style={{ marginBottom: "1.75rem" }}>
+        <h2 style={{ fontSize: "1.1rem", fontWeight: 700, color: "#ffffff", marginBottom: "0.85rem", display: "flex", alignItems: "center", gap: "0.45rem" }}>
+          <UserCheck size={18} color="#00ed64" /> Top People to Unblock You
+        </h2>
+
+        {!person.enriched ? (
+          <div style={{ background: "#111827", border: "1px dashed #374151", borderRadius: "8px", padding: "1.25rem", textAlign: "center", color: "#9ca3af", fontSize: "0.9rem" }}>
+            ⏳ Reading your GitHub profile... matches will compute once indexed.
+          </div>
+        ) : matches.length === 0 ? (
+          <div style={{ background: "#111827", border: "1px dashed #374151", borderRadius: "8px", padding: "1.25rem", textAlign: "center", color: "#9ca3af", fontSize: "0.9rem" }}>
+            No matches yet — check back as more people join.
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
+            {matches.map((m, idx) => {
+              // Strip prefix for display (e.g. "stack:rust" -> "rust", "ai:llm" -> "llm")
+              const cleanReason = m.reason ? m.reason.replace(/^(topic|ai|stack|role|lang):/, "") : "Domain Match";
+
+              return (
+                <div
+                  key={m.handle || idx}
+                  style={{
+                    background: "#111827",
+                    border: "1px solid #374151",
+                    borderRadius: "10px",
+                    padding: "1.1rem 1.25rem",
+                    transition: "border-color 0.15s",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.5rem" }}>
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
+                        <h3 style={{ fontSize: "1.05rem", fontWeight: 700, color: "#ffffff" }}>
+                          {m.name}
+                        </h3>
+                        <Link
+                          href={`/${m.handle}`}
+                          style={{
+                            fontSize: "0.8rem",
+                            color: "#9ca3af",
+                            textDecoration: "none",
+                          }}
+                        >
+                          @{m.handle}
+                        </Link>
+                      </div>
+
+                      <div style={{ fontSize: "0.82rem", color: "#00ed64", display: "flex", alignItems: "center", gap: "0.3rem", marginTop: "0.2rem" }}>
+                        <Mail size={12} /> {m.email}
+                      </div>
+                    </div>
+
+                    {/* Shared Reason Badge */}
+                    <span
+                      style={{
+                        background: "rgba(0, 237, 100, 0.12)",
+                        border: "1px solid rgba(0, 237, 100, 0.3)",
+                        color: "#00ed64",
+                        fontSize: "0.78rem",
+                        fontWeight: 600,
+                        padding: "0.2rem 0.55rem",
+                        borderRadius: "9999px",
+                        textTransform: "capitalize",
+                      }}
+                    >
+                      {cleanReason}
+                    </span>
+                  </div>
+
+                  {/* Evidence Repo Proof */}
+                  {m.evidenceRepo && (
+                    <div
+                      style={{
+                        marginTop: "0.6rem",
+                        padding: "0.6rem 0.75rem",
+                        background: "#0b0f19",
+                        border: "1px solid #1f2937",
+                        borderRadius: "6px",
+                      }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <a
+                          href={m.evidenceRepo.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            color: "#00ed64",
+                            fontWeight: 600,
+                            fontSize: "0.85rem",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "0.3rem",
+                            textDecoration: "none",
+                          }}
+                        >
+                          <Code size={13} /> {m.evidenceRepo.name} <ExternalLink size={11} />
+                        </a>
+
+                        {typeof m.evidenceRepo.stars === "number" && m.evidenceRepo.stars > 0 && (
+                          <span style={{ fontSize: "0.75rem", color: "#fbbf24", display: "flex", alignItems: "center", gap: "0.2rem" }}>
+                            <Star size={11} fill="#fbbf24" /> {m.evidenceRepo.stars}
+                          </span>
+                        )}
+                      </div>
+
+                      {m.evidenceRepo.description && (
+                        <p style={{ fontSize: "0.78rem", color: "#9ca3af", marginTop: "0.25rem", lineHeight: 1.35 }}>
+                          {m.evidenceRepo.description}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Graph Tags Section */}
