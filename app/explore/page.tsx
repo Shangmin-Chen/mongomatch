@@ -10,7 +10,6 @@ import {
   User,
   Compass,
   Cpu,
-  Sparkles,
 } from "lucide-react";
 
 import heroFallbackData from "@/lib/hero-fallback.json";
@@ -35,6 +34,7 @@ interface CandidateDoc {
 }
 
 interface ExploreData {
+  allPeople?: any[];
   target: {
     handle: string;
     name: string;
@@ -109,6 +109,11 @@ export default function ExplorePage() {
     loadGraph(handleInput);
   };
 
+  const handleSelectNode = (selectedHandle: string) => {
+    setHandleInput(selectedHandle);
+    loadGraph(selectedHandle);
+  };
+
   const chosenCandidate = exploreData?.candidates.find(
     (c) => c.handle.toLowerCase() === exploreData?.chosenHandle?.toLowerCase()
   ) || exploreData?.candidates[0];
@@ -127,9 +132,11 @@ export default function ExplorePage() {
       <div style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", zIndex: 1 }}>
         {exploreData && exploreData.target && (
           <KnowledgeGraph
+            allPeople={exploreData.allPeople}
             target={exploreData.target}
             candidates={exploreData.candidates}
             chosenHandle={exploreData.chosenHandle}
+            onSelectHandle={handleSelectNode}
             height="100%"
           />
         )}
@@ -153,7 +160,7 @@ export default function ExplorePage() {
         {/* Navigation & Controls Container */}
         <div
           style={{
-            background: "rgba(15, 23, 42, 0.9)",
+            background: "rgba(15, 23, 42, 0.92)",
             backdropFilter: "blur(14px)",
             border: "1px solid rgba(51, 65, 85, 0.8)",
             borderRadius: "14px",
@@ -170,7 +177,7 @@ export default function ExplorePage() {
             <Link
               href="/"
               style={{
-                color: "#94a3b8",
+                color: "#94a3af",
                 display: "inline-flex",
                 alignItems: "center",
                 gap: "0.3rem",
@@ -194,7 +201,7 @@ export default function ExplorePage() {
           >
             <input
               type="text"
-              placeholder="Search handle (e.g. mongodbtesthelix)..."
+              placeholder="Traverse handle (e.g. mongodbtesthelix)..."
               value={handleInput}
               onChange={(e) => setHandleInput(e.target.value)}
               style={{
@@ -242,7 +249,7 @@ export default function ExplorePage() {
                 loadGraph(chip);
               }}
               style={{
-                background: "rgba(15, 23, 42, 0.8)",
+                background: "rgba(15, 23, 42, 0.82)",
                 backdropFilter: "blur(8px)",
                 border: `1px solid ${chip === "offline" ? "rgba(0, 237, 100, 0.5)" : "rgba(51, 65, 85, 0.7)"}`,
                 color: chip === "offline" ? "#00ed64" : "#cbd5e1",
@@ -364,9 +371,9 @@ export default function ExplorePage() {
           {/* Candidate overview count */}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "0.75rem", fontSize: "0.75rem", color: "#64748b", borderTop: "1px solid #1e293b", paddingTop: "0.5rem" }}>
             <span>
-              Target: <strong style={{ color: "#00ed64" }}>@{exploreData.target.handle}</strong> &middot; Evaluated {exploreData.candidates.length} candidates
+              Target: <strong style={{ color: "#00ed64" }}>@{exploreData.target?.handle}</strong> &middot; Evaluated {exploreData.candidates.length} unblockers
             </span>
-            <span style={{ color: "#00ed64", fontWeight: 600 }}>✦ Click any node card to navigate</span>
+            <span style={{ color: "#00ed64", fontWeight: 600 }}>✦ Click any node card to traverse</span>
           </div>
         </div>
       )}
