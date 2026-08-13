@@ -16,8 +16,11 @@ function cleanGithubHandle(raw: string | undefined | null): string | null {
   s = s.replace(/^www\./, "");
   s = s.replace(/^github\.com\//, "");
   s = s.replace(/^@/, "");
-  s = s.split("/")[0].split("?")[0].split("#")[0].trim();
-  return s.length > 0 ? s : null;
+  s = s.split("?")[0].split("#")[0].trim();
+  const parts = s.split("/").filter(Boolean);
+  if (parts.length >= 2) return `${parts[0]}/${parts[1]}`;
+  if (parts.length === 1) return parts[0];
+  return null;
 }
 
 export async function POST(req: NextRequest) {

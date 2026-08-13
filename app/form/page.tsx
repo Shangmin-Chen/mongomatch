@@ -20,8 +20,11 @@ export default function IntakeFormPage() {
     s = s.replace(/^www\./i, "");
     s = s.replace(/^github\.com\//i, "");
     s = s.replace(/^@/, "");
-    s = s.split("/")[0].split("?")[0].split("#")[0].trim();
-    return s;
+    s = s.split("?")[0].split("#")[0].trim();
+    const parts = s.split("/").filter(Boolean);
+    if (parts.length >= 2) return `${parts[0]}/${parts[1]}`;
+    if (parts.length === 1) return parts[0];
+    return "";
   };
 
   const handleGithubChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -128,7 +131,7 @@ export default function IntakeFormPage() {
 
         {/* GitHub (optional, prefixed input) */}
         <div className="form-group">
-          <label className="label">GitHub Handle (optional)</label>
+          <label className="label">GitHub Repo or Handle (optional)</label>
           <div
             className="github-container"
             onClick={() => githubInputRef.current?.focus()}
@@ -138,7 +141,7 @@ export default function IntakeFormPage() {
               ref={githubInputRef}
               type="text"
               className="github-input"
-              placeholder="handle"
+              placeholder="owner/repo or handle"
               value={github}
               onChange={handleGithubChange}
               autoCapitalize="none"

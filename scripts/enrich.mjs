@@ -89,26 +89,47 @@ function normalizeHandle(raw) {
   s = s.replace(/^www\./, "");
   s = s.replace(/^github\.com\//, "");
   s = s.replace(/^@/, "");
-  s = s.split("/")[0].split("?")[0].split("#")[0].trim();
-  return s.length > 0 ? s : null;
+  s = s.split("?")[0].split("#")[0].trim();
+  const parts = s.split("/").filter(Boolean);
+  if (parts.length >= 2) return `${parts[0]}/${parts[1]}`;
+  if (parts.length === 1) return parts[0];
+  return null;
 }
 
 function validateHandle(raw) {
   const clean = normalizeHandle(raw);
   if (!clean) {
-    return { valid: false, reason: "Missing or empty GitHub handle" };
+    return { valid: false, reason: "Missing or empty GitHub target" };
   }
+  
+  if (clean.includes("/")) {
+    const [owner, repo] = clean.split("/");
+    if (!GITHUB_USERNAME_REGEX.test(owner)) {
+      return { valid: false, reason: `Malformed GitHub owner '${owner}'` };
+    }
+    if (RESERVED_HANDLES.has(owner)) {
+      return { valid: false, reason: `Reserved GitHub path '${owner}'` };
+    }
+    return { valid: true, handle: clean, isRepo: true, owner, repo };
+  }
+
   if (!GITHUB_USERNAME_REGEX.test(clean)) {
     return { valid: false, reason: `Malformed GitHub handle '${clean}'` };
   }
   if (RESERVED_HANDLES.has(clean)) {
     return { valid: false, reason: `Reserved GitHub path '${clean}'` };
   }
-  return { valid: true, handle: clean };
+  return { valid: true, handle: clean, isRepo: false };
 }
 
-async function fetchUserRepos(handle) {
-  const url = `https://api.github.com/users/${handle}/repos?sort=pushed&per_page=30`;
+async function fetchGithubData(validation) {
+  let url = "";
+  if (validation.isRepo) {
+    url = `https://api.github.com/repos/${validation.owner}/${validation.repo}`;
+  } else {
+    url = `https://api.github.com/users/${validation.handle}/repos?sort=pushed&per_page=30`;
+  }
+
   const res = await fetch(url, {
     headers: {
       Authorization: `Bearer ${GITHUB_TOKEN}`,
@@ -121,7 +142,7 @@ async function fetchUserRepos(handle) {
   const rateLimitRemaining = res.headers.get("x-ratelimit-remaining");
   const remainingCount = rateLimitRemaining ? parseInt(rateLimitRemaining, 10) : 5000;
 
-  return { res, remainingCount };
+  return { res, remainingCount, isSingleRepo: !!validation.isRepo };
 }
 
 async function main() {
@@ -190,7 +211,7 @@ async function main() {
 
     // 2. Fetch from GitHub
     try {
-      const { res, remainingCount } = await fetchUserRepos(cleanHandle);
+      const { res, remainingCount, isSingleRepo } = await fetchGithubData(validation);
 
       if (remainingCount < 50) {
         console.warn(`\n⚠️ GitHub rate limit approaching (< 50 remaining: ${remainingCount}). Halting run cleanly.`);
@@ -201,7 +222,7 @@ async function main() {
 
       // Handle 404 -> Permanent Skip
       if (res.status === 404) {
-        const reason = `GitHub user '@${cleanHandle}' not found (404)`;
+        const reason = `GitHub target '@${cleanHandle}' not found (404)`;
         permanentSkipCount++;
         skipReasons[reason] = (skipReasons[reason] || 0) + 1;
         console.log(`[PERM-SKIP] @${cleanHandle}: ${reason}`);
@@ -232,8 +253,9 @@ async function main() {
       }
 
       // Parse repos
-      const rawRepos = await res.json();
-      if (!Array.isArray(rawRepos)) {
+      const rawData = await res.json();
+      const rawRepos = isSingleRepo ? [rawData] : (Array.isArray(rawData) ? rawData : []);
+      if (!Array.isArray(rawRepos) || rawRepos.length === 0) {
         transientSkipCount++;
         console.log(`[TRANSIENT-SKIP] @${cleanHandle}: Invalid JSON response structure`);
         return;
