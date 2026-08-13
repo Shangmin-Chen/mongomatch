@@ -20,7 +20,7 @@ import {
   Network,
 } from "lucide-react";
 
-import KnowledgeGraph, { GraphNode, GraphLink } from "@/components/KnowledgeGraph";
+import KnowledgeGraph from "@/components/KnowledgeGraph";
 
 interface RepoDoc {
   name: string;
@@ -78,7 +78,6 @@ export default function AttendeeDetailPage({
   const [copied, setCopied] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [notFound, setNotFound] = useState(false);
-  const [showGraph, setShowGraph] = useState(true);
 
   const fetchPerson = async (isManual = false) => {
     if (isManual) setRefreshing(true);
@@ -116,85 +115,6 @@ export default function AttendeeDetailPage({
     }
   };
 
-  // Build Graph Nodes and Links for this specific attendee
-  const buildProfileGraph = (): { nodes: GraphNode[]; links: GraphLink[] } => {
-    if (!person) return { nodes: [], links: [] };
-
-    const nodes: GraphNode[] = [];
-    const links: GraphLink[] = [];
-    const tagSet = new Set<string>();
-
-    // 1. Target Node
-    nodes.push({
-      id: person.handle,
-      handle: person.handle,
-      name: person.name || person.handle,
-      type: "you",
-      isChosen: true,
-    });
-
-    matches.forEach((m, idx) => {
-      const isTop = idx === 0;
-
-      nodes.push({
-        id: m.handle,
-        handle: m.handle,
-        name: m.name || m.handle,
-        type: "match",
-        isChosen: isTop,
-        reason: m.reason,
-      });
-
-      const shared = m.sharedTags || [];
-      shared.forEach((tag) => {
-        const tagId = `tag:${tag}`;
-        const isPathTag = isTop && (m.reason === tag || shared.length === 1);
-
-        if (!tagSet.has(tagId)) {
-          tagSet.add(tagId);
-          nodes.push({
-            id: tagId,
-            name: `#${tag}`,
-            type: "tag",
-            isChosen: isPathTag,
-          });
-
-          links.push({
-            source: person.handle,
-            target: tagId,
-            isChosen: isPathTag,
-          });
-        }
-
-        links.push({
-          source: tagId,
-          target: m.handle,
-          isChosen: isPathTag,
-        });
-      });
-
-      // Evidence Repo Node for top match
-      if (isTop && m.evidenceRepo) {
-        const repoId = `repo:${m.evidenceRepo.name}`;
-        nodes.push({
-          id: repoId,
-          name: m.evidenceRepo.name,
-          type: "repo",
-          url: m.evidenceRepo.url,
-          isChosen: true,
-        });
-
-        links.push({
-          source: m.handle,
-          target: repoId,
-          isChosen: true,
-        });
-      }
-    });
-
-    return { nodes, links };
-  };
-
   if (loading) {
     return (
       <main className="wrapper" style={{ textAlign: "center", paddingTop: "3rem" }}>
@@ -218,10 +138,9 @@ export default function AttendeeDetailPage({
 
   const tags = person.tags || [];
   const repos = person.repos || [];
-  const graphData = buildProfileGraph();
 
   return (
-    <main className="wrapper" style={{ maxWidth: "620px" }}>
+    <main className="wrapper" style={{ maxWidth: "660px" }}>
       {/* Top action bar */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem" }}>
         <Link href="/" style={{ color: "#94a3af", fontSize: "0.85rem", display: "flex", alignItems: "center", gap: "0.3rem" }}>
@@ -366,7 +285,7 @@ export default function AttendeeDetailPage({
       </div>
 
       {/* INTERACTIVE KNOWLEDGE GRAPH VIEW */}
-      {person.enriched && graphData.nodes.length > 1 && (
+      {person.enriched && matches.length > 0 && (
         <div style={{ marginBottom: "1.75rem" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
             <h2 style={{ fontSize: "1.05rem", fontWeight: 700, color: "#ffffff", display: "flex", alignItems: "center", gap: "0.45rem" }}>
@@ -381,28 +300,33 @@ export default function AttendeeDetailPage({
                 display: "inline-flex",
                 alignItems: "center",
                 gap: "0.25rem",
+                fontWeight: 600,
               }}
             >
-              <Compass size={13} /> Open Fullscreen Graph
+              <Compass size={13} /> Fullscreen Graph
             </Link>
           </div>
 
           <div
             style={{
-              height: "280px",
+              height: "320px",
               width: "100%",
-              borderRadius: "12px",
+              borderRadius: "14px",
               border: "1px solid #334155",
               overflow: "hidden",
               background: "#050811",
-              boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.4)",
+              boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.5)",
             }}
           >
             <KnowledgeGraph
-              nodes={graphData.nodes}
-              links={graphData.links}
-              height={280}
-              interactive={true}
+              target={{
+                handle: person.handle,
+                name: person.name,
+                description: person.description,
+              }}
+              candidates={matches}
+              chosenHandle={matches[0]?.handle}
+              height={320}
             />
           </div>
         </div>

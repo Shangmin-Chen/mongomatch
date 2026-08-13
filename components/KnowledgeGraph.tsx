@@ -1,424 +1,680 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useMemo, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import dynamic from "next/dynamic";
-import { ZoomIn, ZoomOut, Maximize2, ExternalLink, User } from "lucide-react";
+import {
+  ReactFlow,
+  Background,
+  Controls,
+  MiniMap,
+  Handle,
+  Position,
+  useNodesState,
+  useEdgesState,
+  MarkerType,
+  Node,
+  Edge,
+} from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
+import {
+  User,
+  ExternalLink,
+  Code,
+  Sparkles,
+  Mail,
+  Star,
+  Tag as TagIcon,
+  ArrowRight,
+} from "lucide-react";
+import dagre from "@dagrejs/dagre";
 
-// Dynamically import 2D Force Graph for SSR safety
-const ForceGraph2D = dynamic(() => import("react-force-graph-2d"), { ssr: false });
+// ==========================================
+// 1. CUSTOM NODE COMPONENTS
+// ==========================================
 
-export interface GraphNode {
-  id: string;
-  name: string;
-  type: "you" | "match" | "tag" | "repo";
-  handle?: string;
-  url?: string;
-  val?: number;
-  color?: string;
-  isChosen?: boolean;
-  score?: number;
-  reason?: string;
-  x?: number;
-  y?: number;
-  vx?: number;
-  vy?: number;
-}
-
-export interface GraphLink {
-  source: string | GraphNode;
-  target: string | GraphNode;
-  isChosen?: boolean;
-  color?: string;
-}
-
-export interface KnowledgeGraphProps {
-  nodes: GraphNode[];
-  links: GraphLink[];
-  width?: number;
-  height?: number;
-  onNodeClick?: (node: GraphNode) => void;
-  interactive?: boolean;
-}
-
-export default function KnowledgeGraph({
-  nodes,
-  links,
-  width,
-  height,
-  onNodeClick,
-  interactive = true,
-}: KnowledgeGraphProps) {
+// Target Node (You / Queried Attendee)
+function TargetNode({ data }: { data: any }) {
   const router = useRouter();
-  const graphRef = useRef<any>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [containerDimensions, setContainerDimensions] = useState({
-    width: width || 800,
-    height: height || 500,
-  });
-  const [hoveredNode, setHoveredNode] = useState<string | null>(null);
-
-  // Resize observer
-  useEffect(() => {
-    if (!width || !height) {
-      const updateSize = () => {
-        if (containerRef.current) {
-          const rect = containerRef.current.getBoundingClientRect();
-          setContainerDimensions({
-            width: width || rect.width || 800,
-            height: height || rect.height || 500,
-          });
-        }
-      };
-      updateSize();
-      window.addEventListener("resize", updateSize);
-      return () => window.removeEventListener("resize", updateSize);
-    }
-  }, [width, height]);
-
-  // Auto zoom-to-fit once data loads
-  useEffect(() => {
-    if (graphRef.current && nodes.length > 0) {
-      setTimeout(() => {
-        graphRef.current?.zoomToFit(400, 50);
-      }, 500);
-    }
-  }, [nodes]);
-
-  const handleNodeClick = (node: any) => {
-    if (onNodeClick) {
-      onNodeClick(node as GraphNode);
-      return;
-    }
-
-    if (node.type === "you" || node.type === "match") {
-      const targetHandle = node.handle || node.id;
-      if (targetHandle) {
-        router.push(`/${targetHandle}`);
-      }
-    } else if (node.type === "repo" && node.url) {
-      window.open(node.url, "_blank");
-    }
-  };
-
-  const drawRoundedRect = (
-    ctx: CanvasRenderingContext2D,
-    x: number,
-    y: number,
-    w: number,
-    h: number,
-    r: number
-  ) => {
-    if (w < 2 * r) r = w / 2;
-    if (h < 2 * r) r = h / 2;
-    ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.arcTo(x + w, y, x + w, y + h, r);
-    ctx.arcTo(x + w, y + h, x, y + h, r);
-    ctx.arcTo(x, y + h, x, y, r);
-    ctx.arcTo(x, y, x + w, y, r);
-    ctx.closePath();
-  };
-
-  // Custom 2D Node Canvas Renderer
-  const renderNode = (node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
-    const isTarget = node.type === "you";
-    const isMatch = node.type === "match";
-    const isTag = node.type === "tag";
-    const isRepo = node.type === "repo";
-    const isChosen = Boolean(node.isChosen);
-    const isHovered = hoveredNode === node.id;
-
-    ctx.save();
-
-    if (isTarget || isMatch) {
-      // Draw Person Card / Pill Node
-      const title = node.handle ? `@${node.handle}` : node.name;
-      const subtitle = isTarget
-        ? "YOU (TARGET)"
-        : isChosen
-        ? "TOP UNBLOCKER"
-        : node.name !== node.handle
-        ? node.name
-        : "DEVELOPER";
-
-      ctx.font = `bold 12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
-      const titleWidth = ctx.measureText(title).width;
-      ctx.font = `600 8.5px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
-      const subWidth = ctx.measureText(subtitle).width;
-
-      const cardWidth = Math.max(titleWidth, subWidth) + 36;
-      const cardHeight = 34;
-      const x = (node.x || 0) - cardWidth / 2;
-      const y = (node.y || 0) - cardHeight / 2;
-
-      // Glow Shadow
-      if (isTarget || isChosen || isHovered) {
-        ctx.shadowColor = isTarget || isChosen ? "#00ed64" : "#60a5fa";
-        ctx.shadowBlur = isHovered ? 18 : 10;
-      }
-
-      // Card Fill
-      drawRoundedRect(ctx, x, y, cardWidth, cardHeight, 8);
-      ctx.fillStyle = isTarget
-        ? "#052210"
-        : isChosen
-        ? "#092e17"
-        : isHovered
-        ? "#1e293b"
-        : "#0f172a";
-      ctx.fill();
-
-      // Card Border
-      ctx.lineWidth = isTarget || isChosen ? 2.5 : isHovered ? 2 : 1;
-      ctx.strokeStyle = isTarget
-        ? "#00ed64"
-        : isChosen
-        ? "#00ed64"
-        : isHovered
-        ? "#93c5fd"
-        : "#334155";
-      ctx.stroke();
-      ctx.shadowBlur = 0; // Reset shadow
-
-      // Avatar Circle indicator
-      const circleX = x + 16;
-      const circleY = y + cardHeight / 2;
-      ctx.beginPath();
-      ctx.arc(circleX, circleY, 8, 0, 2 * Math.PI);
-      ctx.fillStyle = isTarget || isChosen ? "rgba(0, 237, 100, 0.2)" : "rgba(148, 163, 184, 0.15)";
-      ctx.fill();
-      ctx.lineWidth = 1.5;
-      ctx.strokeStyle = isTarget || isChosen ? "#00ed64" : "#94a3b8";
-      ctx.stroke();
-
-      // Dot inside avatar
-      ctx.beginPath();
-      ctx.arc(circleX, circleY, 3, 0, 2 * Math.PI);
-      ctx.fillStyle = isTarget || isChosen ? "#00ed64" : "#94a3b8";
-      ctx.fill();
-
-      // Text: Subtitle / Badge
-      ctx.font = `700 7.5px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
-      ctx.fillStyle = isTarget || isChosen ? "#00ed64" : "#94a3b8";
-      ctx.fillText(subtitle.toUpperCase(), x + 30, y + 13);
-
-      // Text: Handle / Name
-      ctx.font = `bold 11px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
-      ctx.fillStyle = "#ffffff";
-      ctx.fillText(title, x + 30, y + 26);
-    } else if (isTag) {
-      // Draw Tag Node
-      const tagText = node.name || node.id;
-      ctx.font = `600 10px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
-      const textWidth = ctx.measureText(tagText).width;
-      const pillWidth = textWidth + 16;
-      const pillHeight = 20;
-      const x = (node.x || 0) - pillWidth / 2;
-      const y = (node.y || 0) - pillHeight / 2;
-
-      if (isChosen || isHovered) {
-        ctx.shadowColor = isChosen ? "#00ed64" : "#38bdf8";
-        ctx.shadowBlur = 8;
-      }
-
-      drawRoundedRect(ctx, x, y, pillWidth, pillHeight, 10);
-      ctx.fillStyle = isChosen ? "#064e3b" : "#082f49";
-      ctx.fill();
-
-      ctx.lineWidth = isChosen ? 1.8 : 1;
-      ctx.strokeStyle = isChosen ? "#00ed64" : "#0284c7";
-      ctx.stroke();
-      ctx.shadowBlur = 0;
-
-      ctx.fillStyle = isChosen ? "#a7f3d0" : "#7dd3fc";
-      ctx.fillText(tagText, x + 8, y + 14);
-    } else if (isRepo) {
-      // Draw Evidence Repo Node
-      const repoText = `📦 ${node.name}`;
-      ctx.font = `bold 10.5px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
-      const textWidth = ctx.measureText(repoText).width;
-      const pillWidth = textWidth + 18;
-      const pillHeight = 22;
-      const x = (node.x || 0) - pillWidth / 2;
-      const y = (node.y || 0) - pillHeight / 2;
-
-      ctx.shadowColor = "#f59e0b";
-      ctx.shadowBlur = 10;
-
-      drawRoundedRect(ctx, x, y, pillWidth, pillHeight, 6);
-      ctx.fillStyle = "#451a03";
-      ctx.fill();
-
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = "#f59e0b";
-      ctx.stroke();
-      ctx.shadowBlur = 0;
-
-      ctx.fillStyle = "#fef3c7";
-      ctx.fillText(repoText, x + 9, y + 15);
-    }
-
-    ctx.restore();
-  };
-
-  // Node Hit Area Painter
-  const paintNodePointerArea = (node: any, color: string, ctx: CanvasRenderingContext2D) => {
-    const isTag = node.type === "tag";
-    const isRepo = node.type === "repo";
-    const w = isTag ? 60 : isRepo ? 90 : 120;
-    const h = isTag ? 20 : isRepo ? 24 : 36;
-    ctx.fillStyle = color;
-    drawRoundedRect(ctx, (node.x || 0) - w / 2, (node.y || 0) - h / 2, w, h, 8);
-    ctx.fill();
-  };
 
   return (
     <div
-      ref={containerRef}
+      onClick={() => router.push(`/${data.handle}`)}
       style={{
-        position: "relative",
-        width: "100%",
-        height: "100%",
-        background: "#050811",
-        borderRadius: "12px",
-        overflow: "hidden",
+        background: "linear-gradient(135deg, #052210 0%, #0b1f14 100%)",
+        border: "2px solid #00ed64",
+        borderRadius: "14px",
+        padding: "14px 18px",
+        minWidth: "220px",
+        maxWidth: "260px",
+        boxShadow: "0 10px 25px -5px rgba(0, 237, 100, 0.3)",
+        cursor: "pointer",
+        transition: "transform 0.15s, box-shadow 0.15s",
+      }}
+      className="hover:scale-105"
+    >
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+        <span
+          style={{
+            background: "rgba(0, 237, 100, 0.2)",
+            color: "#00ed64",
+            fontSize: "10px",
+            fontWeight: 800,
+            padding: "2px 8px",
+            borderRadius: "9999px",
+            letterSpacing: "0.5px",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "4px",
+          }}
+        >
+          <Sparkles size={10} /> TARGET BUILDER
+        </span>
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+        <div
+          style={{
+            width: "36px",
+            height: "36px",
+            borderRadius: "50%",
+            background: "rgba(0, 237, 100, 0.15)",
+            border: "1.5px solid #00ed64",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "#00ed64",
+            fontWeight: 700,
+            fontSize: "14px",
+          }}
+        >
+          {data.name ? data.name.charAt(0).toUpperCase() : <User size={16} />}
+        </div>
+        <div>
+          <div style={{ color: "#ffffff", fontWeight: 700, fontSize: "14px", lineHeight: 1.2 }}>
+            {data.name || data.handle}
+          </div>
+          <div style={{ color: "#00ed64", fontSize: "12px", fontWeight: 600 }}>
+            @{data.handle}
+          </div>
+        </div>
+      </div>
+
+      {data.description && (
+        <p
+          style={{
+            color: "#94a3b8",
+            fontSize: "11px",
+            lineHeight: 1.35,
+            marginTop: "10px",
+            overflow: "hidden",
+            display: "-webkit-box",
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: "vertical",
+          }}
+        >
+          &ldquo;{data.description}&rdquo;
+        </p>
+      )}
+
+      {/* Outgoing Handle */}
+      <Handle
+        type="source"
+        position={Position.Right}
+        style={{
+          background: "#00ed64",
+          width: "10px",
+          height: "10px",
+          border: "2px solid #052210",
+        }}
+      />
+    </div>
+  );
+}
+
+// Tag Node (Domain / Tech / Skill)
+function TagNodeComponent({ data }: { data: any }) {
+  const isChosen = data.isChosen;
+
+  return (
+    <div
+      style={{
+        background: isChosen ? "#064e3b" : "#082f49",
+        border: `1.5px solid ${isChosen ? "#00ed64" : "#0284c7"}`,
+        borderRadius: "9999px",
+        padding: "6px 14px",
+        boxShadow: isChosen
+          ? "0 0 15px rgba(0, 237, 100, 0.4)"
+          : "0 4px 10px rgba(0, 0, 0, 0.4)",
+        display: "flex",
+        alignItems: "center",
+        gap: "6px",
+        cursor: "default",
       }}
     >
-      <ForceGraph2D
-        ref={graphRef}
-        width={containerDimensions.width}
-        height={containerDimensions.height}
-        graphData={{ nodes, links }}
-        backgroundColor="#050811"
-        nodeCanvasObject={renderNode}
-        nodePointerAreaPaint={paintNodePointerArea}
-        linkColor={(link: any) =>
-          link.isChosen ? "#00ed64" : "rgba(148, 163, 184, 0.18)"
-        }
-        linkWidth={(link: any) => (link.isChosen ? 2.5 : 0.8)}
-        linkDirectionalParticles={(link: any) => (link.isChosen ? 4 : 0)}
-        linkDirectionalParticleSpeed={0.008}
-        linkDirectionalParticleWidth={2.5}
-        linkDirectionalParticleColor={() => "#00ed64"}
-        d3VelocityDecay={0.25}
-        cooldownTicks={120}
-        onNodeClick={handleNodeClick}
-        onNodeHover={(node: any) => {
-          setHoveredNode(node ? node.id : null);
-          if (containerRef.current) {
-            containerRef.current.style.cursor = node ? "pointer" : "default";
-          }
+      <Handle
+        type="target"
+        position={Position.Left}
+        style={{
+          background: isChosen ? "#00ed64" : "#0284c7",
+          width: "8px",
+          height: "8px",
+          border: "2px solid #082f49",
         }}
       />
 
-      {/* Floating Graph Controls */}
-      {interactive && (
-        <div
+      <TagIcon size={12} color={isChosen ? "#a7f3d0" : "#7dd3fc"} />
+      <span
+        style={{
+          color: isChosen ? "#ffffff" : "#bae6fd",
+          fontSize: "12px",
+          fontWeight: 700,
+        }}
+      >
+        {data.label}
+      </span>
+
+      <Handle
+        type="source"
+        position={Position.Right}
+        style={{
+          background: isChosen ? "#00ed64" : "#0284c7",
+          width: "8px",
+          height: "8px",
+          border: "2px solid #082f49",
+        }}
+      />
+    </div>
+  );
+}
+
+// Match Node (Candidate Peer Developer)
+function MatchNodeComponent({ data }: { data: any }) {
+  const router = useRouter();
+  const isChosen = data.isChosen;
+
+  return (
+    <div
+      onClick={() => router.push(`/${data.handle}`)}
+      style={{
+        background: isChosen
+          ? "linear-gradient(135deg, #092e17 0%, #0f3d20 100%)"
+          : "#0f172a",
+        border: `2px solid ${isChosen ? "#00ed64" : "#334155"}`,
+        borderRadius: "14px",
+        padding: "14px 16px",
+        minWidth: "230px",
+        maxWidth: "270px",
+        boxShadow: isChosen
+          ? "0 10px 30px -5px rgba(0, 237, 100, 0.35)"
+          : "0 6px 15px rgba(0, 0, 0, 0.4)",
+        cursor: "pointer",
+        transition: "transform 0.15s, border-color 0.15s",
+      }}
+      className="hover:scale-105"
+    >
+      <Handle
+        type="target"
+        position={Position.Left}
+        style={{
+          background: isChosen ? "#00ed64" : "#64748b",
+          width: "10px",
+          height: "10px",
+          border: "2px solid #0f172a",
+        }}
+      />
+
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+        <span
           style={{
-            position: "absolute",
-            bottom: "1rem",
-            right: "1rem",
-            display: "flex",
-            flexDirection: "column",
-            gap: "0.4rem",
-            zIndex: 15,
+            background: isChosen ? "rgba(0, 237, 100, 0.25)" : "rgba(148, 163, 184, 0.12)",
+            color: isChosen ? "#00ed64" : "#94a3b8",
+            fontSize: "10px",
+            fontWeight: 800,
+            padding: "2px 8px",
+            borderRadius: "9999px",
+            letterSpacing: "0.4px",
           }}
         >
-          <button
-            onClick={() => graphRef.current?.zoom(graphRef.current.zoom() * 1.3, 300)}
-            title="Zoom In"
-            style={{
-              background: "rgba(15, 23, 42, 0.85)",
-              backdropFilter: "blur(8px)",
-              border: "1px solid #334155",
-              color: "#f8fafc",
-              width: "32px",
-              height: "32px",
-              borderRadius: "6px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-            }}
-          >
-            <ZoomIn size={15} />
-          </button>
-          <button
-            onClick={() => graphRef.current?.zoom(graphRef.current.zoom() * 0.7, 300)}
-            title="Zoom Out"
-            style={{
-              background: "rgba(15, 23, 42, 0.85)",
-              backdropFilter: "blur(8px)",
-              border: "1px solid #334155",
-              color: "#f8fafc",
-              width: "32px",
-              height: "32px",
-              borderRadius: "6px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-            }}
-          >
-            <ZoomOut size={15} />
-          </button>
-          <button
-            onClick={() => graphRef.current?.zoomToFit(400, 50)}
-            title="Fit to Screen"
-            style={{
-              background: "rgba(15, 23, 42, 0.85)",
-              backdropFilter: "blur(8px)",
-              border: "1px solid #334155",
-              color: "#f8fafc",
-              width: "32px",
-              height: "32px",
-              borderRadius: "6px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-            }}
-          >
-            <Maximize2 size={14} />
-          </button>
+          {isChosen ? "★ TOP UNBLOCKER" : "CANDIDATE PEER"}
+        </span>
+
+        {data.score && (
+          <span style={{ fontSize: "11px", color: isChosen ? "#00ed64" : "#64748b", fontWeight: 700 }}>
+            Score {data.score}
+          </span>
+        )}
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+        <div
+          style={{
+            width: "34px",
+            height: "34px",
+            borderRadius: "50%",
+            background: isChosen ? "rgba(0, 237, 100, 0.2)" : "rgba(51, 65, 85, 0.5)",
+            border: `1.5px solid ${isChosen ? "#00ed64" : "#475569"}`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: isChosen ? "#00ed64" : "#e2e8f0",
+            fontWeight: 700,
+            fontSize: "13px",
+          }}
+        >
+          {data.name ? data.name.charAt(0).toUpperCase() : <User size={15} />}
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ color: "#ffffff", fontWeight: 700, fontSize: "13.5px", lineHeight: 1.2 }}>
+            {data.name || data.handle}
+          </div>
+          <div style={{ color: isChosen ? "#00ed64" : "#94a3b8", fontSize: "12px", fontWeight: 600 }}>
+            @{data.handle}
+          </div>
+        </div>
+      </div>
+
+      {data.email && (
+        <div style={{ display: "flex", alignItems: "center", gap: "5px", color: "#64748b", fontSize: "11px", marginTop: "8px" }}>
+          <Mail size={11} color={isChosen ? "#00ed64" : "#94a3b8"} /> {data.email}
         </div>
       )}
 
-      {/* Legend & Interactive Click Hint Overlay */}
+      <div style={{ marginTop: "10px", display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid rgba(51, 65, 85, 0.5)", paddingTop: "8px" }}>
+        <span style={{ color: isChosen ? "#00ed64" : "#94a3b8", fontSize: "11px", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: "4px" }}>
+          View Profile <ArrowRight size={11} />
+        </span>
+      </div>
+
+      {/* Source handle if evidence repo attached */}
+      {isChosen && (
+        <Handle
+          type="source"
+          position={Position.Right}
+          style={{
+            background: "#00ed64",
+            width: "10px",
+            height: "10px",
+            border: "2px solid #092e17",
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// Evidence Repo Node (GitHub Repository Proof)
+function RepoNodeComponent({ data }: { data: any }) {
+  return (
+    <div
+      onClick={() => data.url && window.open(data.url, "_blank")}
+      style={{
+        background: "linear-gradient(135deg, #451a03 0%, #291102 100%)",
+        border: "2px solid #f59e0b",
+        borderRadius: "14px",
+        padding: "12px 16px",
+        minWidth: "210px",
+        maxWidth: "250px",
+        boxShadow: "0 10px 25px -5px rgba(245, 158, 11, 0.3)",
+        cursor: "pointer",
+        transition: "transform 0.15s",
+      }}
+      className="hover:scale-105"
+    >
+      <Handle
+        type="target"
+        position={Position.Left}
+        style={{
+          background: "#f59e0b",
+          width: "10px",
+          height: "10px",
+          border: "2px solid #451a03",
+        }}
+      />
+
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+        <span
+          style={{
+            background: "rgba(245, 158, 11, 0.2)",
+            color: "#fbbf24",
+            fontSize: "10px",
+            fontWeight: 800,
+            padding: "2px 8px",
+            borderRadius: "9999px",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "4px",
+          }}
+        >
+          <Code size={10} /> PROOF CODEBASE
+        </span>
+
+        {typeof data.stars === "number" && data.stars > 0 && (
+          <span style={{ fontSize: "11px", color: "#fbbf24", display: "flex", alignItems: "center", gap: "3px", fontWeight: 700 }}>
+            <Star size={11} fill="#fbbf24" /> {data.stars}
+          </span>
+        )}
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
+        <div style={{ color: "#ffffff", fontWeight: 700, fontSize: "13.5px" }}>
+          {data.name}
+        </div>
+        <ExternalLink size={13} color="#fbbf24" />
+      </div>
+
+      {data.language && (
+        <div style={{ color: "#fef3c7", fontSize: "11px", marginTop: "4px" }}>
+          Primary Language: <strong>{data.language}</strong>
+        </div>
+      )}
+
+      <div style={{ color: "#fbbf24", fontSize: "11px", fontWeight: 600, marginTop: "8px", display: "flex", alignItems: "center", gap: "4px" }}>
+        Open GitHub Repository ↗
+      </div>
+    </div>
+  );
+}
+
+// Node types mapping for React Flow
+const nodeTypes = {
+  targetNode: TargetNode,
+  tagNode: TagNodeComponent,
+  matchNode: MatchNodeComponent,
+  repoNode: RepoNodeComponent,
+};
+
+// ==========================================
+// 2. DAGRE AUTOMATIC LAYOUT HELPER
+// ==========================================
+function getLayoutedElements(nodes: Node[], edges: Edge[]) {
+  const dagreGraph = new dagre.graphlib.Graph();
+  dagreGraph.setDefaultEdgeLabel(() => ({}));
+
+  // Left-to-Right layout with comfortable spacing
+  dagreGraph.setGraph({
+    rankdir: "LR",
+    nodesep: 40,
+    ranksep: 90,
+    marginx: 40,
+    marginy: 40,
+  });
+
+  nodes.forEach((node) => {
+    const isTag = node.type === "tagNode";
+    const isRepo = node.type === "repoNode";
+    const width = isTag ? 150 : isRepo ? 230 : 250;
+    const height = isTag ? 45 : isRepo ? 110 : 130;
+    dagreGraph.setNode(node.id, { width, height });
+  });
+
+  edges.forEach((edge) => {
+    dagreGraph.setEdge(edge.source, edge.target);
+  });
+
+  dagre.layout(dagreGraph);
+
+  const layoutedNodes = nodes.map((node) => {
+    const nodeWithPosition = dagreGraph.node(node.id);
+    const isTag = node.type === "tagNode";
+    const isRepo = node.type === "repoNode";
+    const width = isTag ? 150 : isRepo ? 230 : 250;
+    const height = isTag ? 45 : isRepo ? 110 : 130;
+
+    return {
+      ...node,
+      position: {
+        x: nodeWithPosition.x - width / 2,
+        y: nodeWithPosition.y - height / 2,
+      },
+    };
+  });
+
+  return { nodes: layoutedNodes, edges };
+}
+
+// ==========================================
+// 3. MAIN KNOWLEDGE GRAPH COMPONENT
+// ==========================================
+export interface KnowledgeGraphDataProps {
+  target: {
+    handle: string;
+    name: string;
+    description?: string;
+  };
+  candidates: Array<{
+    handle: string;
+    name: string;
+    email?: string;
+    description?: string;
+    sharedTags?: string[];
+    reason?: string;
+    score?: number;
+    evidenceRepo?: {
+      name: string;
+      url: string;
+      language?: string | null;
+      stars?: number;
+    } | null;
+  }>;
+  chosenHandle?: string;
+  height?: string | number;
+}
+
+export default function KnowledgeGraph({
+  target,
+  candidates = [],
+  chosenHandle,
+  height = "100%",
+}: KnowledgeGraphDataProps) {
+  const { nodes: initialNodes, edges: initialEdges } = useMemo(() => {
+    if (!target || !target.handle) return { nodes: [], edges: [] };
+
+    const rawNodes: Node[] = [];
+    const rawEdges: Edge[] = [];
+    const tagSet = new Set<string>();
+
+    const activeChosen = (chosenHandle || candidates[0]?.handle || "").toLowerCase();
+
+    // 1. Target Node
+    rawNodes.push({
+      id: target.handle,
+      type: "targetNode",
+      data: {
+        handle: target.handle,
+        name: target.name || target.handle,
+        description: target.description || "",
+      },
+      position: { x: 0, y: 0 },
+    });
+
+    const chosenCandidate = candidates.find(
+      (c) => c.handle.toLowerCase() === activeChosen
+    ) || candidates[0];
+
+    // 2. Candidate Nodes & Tag Edges
+    candidates.forEach((candidate) => {
+      const isChosen = candidate.handle.toLowerCase() === activeChosen;
+
+      rawNodes.push({
+        id: candidate.handle,
+        type: "matchNode",
+        data: {
+          handle: candidate.handle,
+          name: candidate.name || candidate.handle,
+          email: candidate.email,
+          score: candidate.score,
+          isChosen,
+          reason: candidate.reason,
+        },
+        position: { x: 0, y: 0 },
+      });
+
+      // Tags shared with target
+      const shared = candidate.sharedTags || [];
+      shared.forEach((tag) => {
+        const tagId = `tag:${tag}`;
+        const isPathTag = isChosen && (candidate.reason === tag || shared.length === 1);
+
+        if (!tagSet.has(tagId)) {
+          tagSet.add(tagId);
+          rawNodes.push({
+            id: tagId,
+            type: "tagNode",
+            data: {
+              label: `#${tag}`,
+              isChosen: isPathTag,
+            },
+            position: { x: 0, y: 0 },
+          });
+
+          // Edge: Target -> Tag
+          rawEdges.push({
+            id: `edge-${target.handle}-${tagId}`,
+            source: target.handle,
+            target: tagId,
+            animated: isPathTag,
+            style: {
+              stroke: isPathTag ? "#00ed64" : "rgba(148, 163, 184, 0.4)",
+              strokeWidth: isPathTag ? 3 : 1.5,
+            },
+            markerEnd: {
+              type: MarkerType.ArrowClosed,
+              color: isPathTag ? "#00ed64" : "#64748b",
+            },
+          });
+        }
+
+        // Edge: Tag -> Candidate
+        rawEdges.push({
+          id: `edge-${tagId}-${candidate.handle}`,
+          source: tagId,
+          target: candidate.handle,
+          animated: isPathTag,
+          style: {
+            stroke: isPathTag ? "#00ed64" : "rgba(148, 163, 184, 0.4)",
+            strokeWidth: isPathTag ? 3 : 1.5,
+          },
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            color: isPathTag ? "#00ed64" : "#64748b",
+          },
+        });
+      });
+    });
+
+    // 3. Evidence Repo Node
+    if (chosenCandidate?.evidenceRepo) {
+      const repoId = `repo:${chosenCandidate.evidenceRepo.name}`;
+      rawNodes.push({
+        id: repoId,
+        type: "repoNode",
+        data: {
+          name: chosenCandidate.evidenceRepo.name,
+          url: chosenCandidate.evidenceRepo.url,
+          language: chosenCandidate.evidenceRepo.language,
+          stars: chosenCandidate.evidenceRepo.stars,
+        },
+        position: { x: 0, y: 0 },
+      });
+
+      rawEdges.push({
+        id: `edge-${chosenCandidate.handle}-${repoId}`,
+        source: chosenCandidate.handle,
+        target: repoId,
+        animated: true,
+        style: {
+          stroke: "#f59e0b",
+          strokeWidth: 3,
+        },
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          color: "#f59e0b",
+        },
+      });
+    }
+
+    return getLayoutedElements(rawNodes, rawEdges);
+  }, [target, candidates, chosenHandle]);
+
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+
+  useEffect(() => {
+    setNodes(initialNodes);
+    setEdges(initialEdges);
+  }, [initialNodes, initialEdges, setNodes, setEdges]);
+
+  return (
+    <div
+      style={{
+        width: "100%",
+        height: height,
+        background: "#050811",
+        borderRadius: "12px",
+        overflow: "hidden",
+        position: "relative",
+      }}
+    >
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        nodeTypes={nodeTypes}
+        fitView
+        fitViewOptions={{ padding: 0.25, duration: 400 }}
+        minZoom={0.2}
+        maxZoom={1.8}
+        proOptions={{ hideAttribution: true }}
+      >
+        <Background color="#1e293b" gap={20} size={1} />
+        <Controls
+          showInteractive={false}
+          style={{
+            background: "rgba(15, 23, 42, 0.9)",
+            border: "1px solid #334155",
+            borderRadius: "8px",
+            fill: "#ffffff",
+          }}
+        />
+        <MiniMap
+          nodeColor={(n) => {
+            if (n.type === "targetNode") return "#00ed64";
+            if (n.type === "tagNode") return "#0284c7";
+            if (n.type === "repoNode") return "#f59e0b";
+            return "#64748b";
+          }}
+          maskColor="rgba(5, 8, 17, 0.7)"
+          style={{
+            background: "rgba(15, 23, 42, 0.8)",
+            border: "1px solid #334155",
+            borderRadius: "8px",
+          }}
+        />
+      </ReactFlow>
+
+      {/* Floating Clickable Instruction */}
       <div
         style={{
           position: "absolute",
-          top: "1rem",
-          left: "1rem",
-          background: "rgba(15, 23, 42, 0.85)",
+          top: "12px",
+          left: "12px",
+          background: "rgba(15, 23, 42, 0.88)",
           backdropFilter: "blur(8px)",
           border: "1px solid rgba(51, 65, 85, 0.8)",
           borderRadius: "8px",
-          padding: "0.5rem 0.75rem",
-          fontSize: "0.75rem",
+          padding: "6px 12px",
+          fontSize: "11.5px",
           color: "#94a3b8",
           display: "flex",
-          flexWrap: "wrap",
           alignItems: "center",
-          gap: "0.75rem",
-          zIndex: 15,
+          gap: "8px",
+          zIndex: 10,
         }}
       >
-        <span style={{ color: "#ffffff", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: "0.25rem" }}>
-          💡 <span style={{ color: "#00ed64" }}>Click any developer card</span> to open profile
+        <span style={{ color: "#ffffff", fontWeight: 700 }}>
+          💡 <span style={{ color: "#00ed64" }}>Click any developer card</span> to navigate to their profile
         </span>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: "0.25rem" }}>
-            <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#00ed64" }} /> Match
-          </span>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: "0.25rem" }}>
-            <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#0284c7" }} /> Tag
-          </span>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: "0.25rem" }}>
-            <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#f59e0b" }} /> Repo Proof
-          </span>
-        </div>
       </div>
     </div>
   );

@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   Search,
@@ -11,10 +10,11 @@ import {
   User,
   Compass,
   Cpu,
+  Sparkles,
 } from "lucide-react";
 
 import heroFallbackData from "@/lib/hero-fallback.json";
-import KnowledgeGraph, { GraphNode, GraphLink } from "@/components/KnowledgeGraph";
+import KnowledgeGraph from "@/components/KnowledgeGraph";
 
 interface CandidateDoc {
   handle: string;
@@ -57,24 +57,10 @@ const SAMPLE_CHIPS = [
 ];
 
 export default function ExplorePage() {
-  const router = useRouter();
   const [handleInput, setHandleInput] = useState("mongodbtesthelix");
   const [loading, setLoading] = useState(false);
   const [exploreData, setExploreData] = useState<ExploreData | null>(heroFallbackData as ExploreData);
   const [error, setError] = useState<string | null>(null);
-  const [dimensions, setDimensions] = useState({ width: 1200, height: 800 });
-
-  // Responsive window resize listener
-  useEffect(() => {
-    const updateDimensions = () => {
-      if (typeof window !== "undefined") {
-        setDimensions({ width: window.innerWidth, height: window.innerHeight });
-      }
-    };
-    updateDimensions();
-    window.addEventListener("resize", updateDimensions);
-    return () => window.removeEventListener("resize", updateDimensions);
-  }, []);
 
   const loadGraph = async (handle: string) => {
     if (!handle.trim()) return;
@@ -123,100 +109,9 @@ export default function ExplorePage() {
     loadGraph(handleInput);
   };
 
-  // Construct Force Graph Node/Link Data
-  const buildGraphData = (): { nodes: GraphNode[]; links: GraphLink[] } => {
-    if (!exploreData || !exploreData.target) {
-      return { nodes: [], links: [] };
-    }
-
-    const { target, candidates, chosenHandle } = exploreData;
-    const nodes: GraphNode[] = [];
-    const links: GraphLink[] = [];
-    const tagSet = new Set<string>();
-
-    // 1. Target Node
-    nodes.push({
-      id: target.handle,
-      handle: target.handle,
-      name: target.name || target.handle,
-      type: "you",
-      isChosen: true,
-    });
-
-    const chosenCandidate = candidates.find(
-      (c) => c.handle.toLowerCase() === chosenHandle.toLowerCase()
-    );
-
-    // 2. Candidate Nodes & Tag Connections
-    candidates.forEach((candidate) => {
-      const isChosen = candidate.handle.toLowerCase() === chosenHandle.toLowerCase();
-
-      nodes.push({
-        id: candidate.handle,
-        handle: candidate.handle,
-        name: candidate.name || candidate.handle,
-        type: "match",
-        isChosen,
-        reason: candidate.reason,
-      });
-
-      // Tags shared with target
-      const shared = candidate.sharedTags || [];
-      shared.forEach((tag) => {
-        const tagId = `tag:${tag}`;
-        const isPathTag = isChosen && (candidate.reason === tag || shared.length === 1);
-
-        if (!tagSet.has(tagId)) {
-          tagSet.add(tagId);
-          nodes.push({
-            id: tagId,
-            name: `#${tag}`,
-            type: "tag",
-            isChosen: isPathTag,
-          });
-
-          // Link from Target to Tag
-          links.push({
-            source: target.handle,
-            target: tagId,
-            isChosen: isPathTag,
-          });
-        }
-
-        // Link from Tag to Candidate
-        links.push({
-          source: tagId,
-          target: candidate.handle,
-          isChosen: isPathTag,
-        });
-      });
-    });
-
-    // 3. One Repo Node for the Chosen Candidate
-    if (chosenCandidate?.evidenceRepo) {
-      const repoId = `repo:${chosenCandidate.evidenceRepo.name}`;
-      nodes.push({
-        id: repoId,
-        name: chosenCandidate.evidenceRepo.name,
-        type: "repo",
-        url: chosenCandidate.evidenceRepo.url,
-        isChosen: true,
-      });
-
-      links.push({
-        source: chosenCandidate.handle,
-        target: repoId,
-        isChosen: true,
-      });
-    }
-
-    return { nodes, links };
-  };
-
-  const { nodes, links } = buildGraphData();
   const chosenCandidate = exploreData?.candidates.find(
-    (c) => c.handle.toLowerCase() === exploreData?.chosenHandle.toLowerCase()
-  );
+    (c) => c.handle.toLowerCase() === exploreData?.chosenHandle?.toLowerCase()
+  ) || exploreData?.candidates[0];
 
   return (
     <div
@@ -228,15 +123,14 @@ export default function ExplorePage() {
         background: "#050811",
       }}
     >
-      {/* 2D Force Graph Canvas Layer */}
+      {/* React Flow Knowledge Graph Canvas Layer */}
       <div style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", zIndex: 1 }}>
-        {nodes.length > 0 && (
+        {exploreData && exploreData.target && (
           <KnowledgeGraph
-            nodes={nodes}
-            links={links}
-            width={dimensions.width}
-            height={dimensions.height}
-            interactive={true}
+            target={exploreData.target}
+            candidates={exploreData.candidates}
+            chosenHandle={exploreData.chosenHandle}
+            height="100%"
           />
         )}
       </div>
@@ -250,7 +144,7 @@ export default function ExplorePage() {
           transform: "translateX(-50%)",
           zIndex: 20,
           width: "90%",
-          maxWidth: "760px",
+          maxWidth: "780px",
           display: "flex",
           flexDirection: "column",
           gap: "0.75rem",
@@ -259,12 +153,12 @@ export default function ExplorePage() {
         {/* Navigation & Controls Container */}
         <div
           style={{
-            background: "rgba(15, 23, 42, 0.88)",
-            backdropFilter: "blur(12px)",
+            background: "rgba(15, 23, 42, 0.9)",
+            backdropFilter: "blur(14px)",
             border: "1px solid rgba(51, 65, 85, 0.8)",
-            borderRadius: "12px",
-            padding: "0.75rem 1rem",
-            boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.6)",
+            borderRadius: "14px",
+            padding: "0.75rem 1.1rem",
+            boxShadow: "0 15px 30px -5px rgba(0, 0, 0, 0.7)",
             display: "flex",
             flexWrap: "wrap",
             alignItems: "center",
@@ -282,20 +176,21 @@ export default function ExplorePage() {
                 gap: "0.3rem",
                 fontSize: "0.85rem",
                 textDecoration: "none",
+                fontWeight: 600,
               }}
             >
               <ArrowLeft size={15} /> Back
             </Link>
 
             <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", color: "#ffffff", fontWeight: 700, fontSize: "0.95rem" }}>
-              <Compass size={18} color="#00ed64" /> MongoMatch Live Graph
+              <Compass size={18} color="#00ed64" /> MongoMatch Knowledge Graph
             </div>
           </div>
 
           {/* Search Form */}
           <form
             onSubmit={handleSearchSubmit}
-            style={{ display: "flex", alignItems: "center", gap: "0.4rem", flex: "1 1 240px", maxWidth: "340px" }}
+            style={{ display: "flex", alignItems: "center", gap: "0.4rem", flex: "1 1 240px", maxWidth: "360px" }}
           >
             <input
               type="text"
@@ -306,9 +201,9 @@ export default function ExplorePage() {
                 flex: 1,
                 background: "#0b0f19",
                 border: "1px solid #334155",
-                borderRadius: "6px",
+                borderRadius: "8px",
                 color: "#f8fafc",
-                padding: "0.4rem 0.65rem",
+                padding: "0.45rem 0.75rem",
                 fontSize: "0.85rem",
                 outline: "none",
               }}
@@ -321,13 +216,14 @@ export default function ExplorePage() {
                 border: "none",
                 color: "#001e00",
                 fontWeight: 700,
-                padding: "0.4rem 0.75rem",
-                borderRadius: "6px",
+                padding: "0.45rem 0.85rem",
+                borderRadius: "8px",
                 cursor: "pointer",
                 display: "flex",
                 alignItems: "center",
-                gap: "0.25rem",
+                gap: "0.3rem",
                 fontSize: "0.82rem",
+                boxShadow: "0 0 12px rgba(0, 237, 100, 0.4)",
               }}
             >
               <Search size={14} />
@@ -337,7 +233,7 @@ export default function ExplorePage() {
         </div>
 
         {/* Quick-Pick Handle Chips */}
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem", justifyContent: "center" }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.45rem", justifyContent: "center" }}>
           {SAMPLE_CHIPS.map((chip) => (
             <button
               key={chip}
@@ -346,12 +242,12 @@ export default function ExplorePage() {
                 loadGraph(chip);
               }}
               style={{
-                background: "rgba(15, 23, 42, 0.75)",
-                backdropFilter: "blur(6px)",
-                border: "1px solid rgba(51, 65, 85, 0.7)",
+                background: "rgba(15, 23, 42, 0.8)",
+                backdropFilter: "blur(8px)",
+                border: `1px solid ${chip === "offline" ? "rgba(0, 237, 100, 0.5)" : "rgba(51, 65, 85, 0.7)"}`,
                 color: chip === "offline" ? "#00ed64" : "#cbd5e1",
                 fontSize: "0.75rem",
-                padding: "0.2rem 0.6rem",
+                padding: "0.25rem 0.7rem",
                 borderRadius: "9999px",
                 cursor: "pointer",
                 fontWeight: chip === "offline" ? 700 : 500,
@@ -368,7 +264,7 @@ export default function ExplorePage() {
         <div
           style={{
             position: "absolute",
-            top: "7rem",
+            top: "7.5rem",
             left: "50%",
             transform: "translateX(-50%)",
             zIndex: 20,
@@ -394,13 +290,13 @@ export default function ExplorePage() {
             transform: "translateX(-50%)",
             zIndex: 20,
             width: "90%",
-            maxWidth: "760px",
-            background: "rgba(11, 15, 25, 0.92)",
-            backdropFilter: "blur(16px)",
+            maxWidth: "780px",
+            background: "rgba(11, 15, 25, 0.94)",
+            backdropFilter: "blur(18px)",
             border: "1px solid rgba(0, 237, 100, 0.35)",
-            borderRadius: "14px",
+            borderRadius: "16px",
             padding: "1.25rem 1.5rem",
-            boxShadow: "0 20px 35px -10px rgba(0, 0, 0, 0.8)",
+            boxShadow: "0 25px 40px -10px rgba(0, 0, 0, 0.85)",
           }}
         >
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.6rem" }}>
@@ -409,13 +305,13 @@ export default function ExplorePage() {
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
-                  gap: "0.3rem",
-                  background: "rgba(0, 237, 100, 0.12)",
-                  border: "1px solid rgba(0, 237, 100, 0.3)",
+                  gap: "0.35rem",
+                  background: "rgba(0, 237, 100, 0.15)",
+                  border: "1px solid rgba(0, 237, 100, 0.35)",
                   color: "#00ed64",
                   fontSize: "0.75rem",
-                  fontWeight: 700,
-                  padding: "0.2rem 0.55rem",
+                  fontWeight: 800,
+                  padding: "0.2rem 0.6rem",
                   borderRadius: "9999px",
                 }}
               >
@@ -468,9 +364,9 @@ export default function ExplorePage() {
           {/* Candidate overview count */}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "0.75rem", fontSize: "0.75rem", color: "#64748b", borderTop: "1px solid #1e293b", paddingTop: "0.5rem" }}>
             <span>
-              Target: <strong style={{ color: "#00ed64" }}>@{exploreData.target.handle}</strong> &middot; Evaluated {exploreData.candidates.length} graph candidates
+              Target: <strong style={{ color: "#00ed64" }}>@{exploreData.target.handle}</strong> &middot; Evaluated {exploreData.candidates.length} candidates
             </span>
-            <span style={{ color: "#00ed64" }}>✦ Click node to view profile</span>
+            <span style={{ color: "#00ed64", fontWeight: 600 }}>✦ Click any node card to navigate</span>
           </div>
         </div>
       )}
