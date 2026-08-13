@@ -1,401 +1,465 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import {
   ArrowLeft,
   Search,
   ExternalLink,
-  Code,
-  User,
-  Compass,
-  Cpu,
+  Mail,
+  Sparkles,
+  Loader2,
+  AlertCircle,
+  Star,
+  Users,
 } from "lucide-react";
 
-import dynamic from "next/dynamic";
 import heroFallbackData from "@/lib/hero-fallback.json";
 
 const KnowledgeGraph = dynamic(() => import("@/components/KnowledgeGraph"), {
   ssr: false,
   loading: () => (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", color: "#94a3b8", gap: "10px" }}>
-      <div className="spinner" style={{ width: "32px", height: "32px" }} />
-      <span style={{ fontSize: "14px", fontWeight: 600 }}>Loading Knowledge Graph...</span>
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "#64748b", fontSize: "0.85rem" }}>
+      Loading graph…
     </div>
   ),
 });
 
-interface CandidateDoc {
+interface Candidate {
   handle: string;
   name: string;
-  email: string;
-  description: string;
-  sharedTags: string[];
-  reason: string;
-  evidenceRepo?: {
-    name: string;
-    url: string;
-    description: string;
-    language: string | null;
-    stars: number;
-  } | null;
-  path: any[];
-  score: number;
+  email?: string;
+  description?: string;
+  sharedTags?: string[];
+  reason?: string;
+  score?: number;
+  evidenceRepo?: { name: string; url: string; description?: string; language?: string | null; stars?: number } | null;
 }
 
 interface ExploreData {
-  target: {
-    handle: string;
-    name: string;
-    description: string;
-    tags: string[];
-  };
-  candidates: CandidateDoc[];
+  target: { handle: string; name: string; description: string; tags: string[] };
+  candidates: Candidate[];
   chosenHandle: string;
   narration: string;
   degraded: boolean;
 }
 
-const SAMPLE_CHIPS = [
-  "langchain-ai/langgraph",
-  "shangmin-chen/mongomatch",
-  "hwchase17/langchain",
-  "shadcn/ui",
-  "redis/redis",
-  "tokio-rs/tokio",
-  "qdrant/qdrant",
-  "offline",
-];
+interface DirectoryPerson {
+  handle: string;
+  name: string;
+  tags?: string[];
+}
+
+const SUGGESTED = ["langchain-ai/langgraph", "shangmin-chen/mongomatch", "qdrant/qdrant", "tokio-rs/tokio"];
 
 export default function ExplorePage() {
-  const [handleInput, setHandleInput] = useState("langchain-ai/langgraph");
+  const [query, setQuery] = useState("langchain-ai/langgraph");
+  const [directory, setDirectory] = useState<DirectoryPerson[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [exploreData, setExploreData] = useState<ExploreData | null>(heroFallbackData as ExploreData);
   const [error, setError] = useState<string | null>(null);
+  const [data, setData] = useState<ExploreData | null>(null);
+  const [selectedHandle, setSelectedHandle] = useState<string | null>(null);
+  const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
-  const loadGraph = async (handle: string) => {
-    if (!handle.trim()) return;
-    const clean = handle.trim().toLowerCase();
+  useEffect(() => {
+    fetch("/api/people")
+      .then((r) => r.json())
+      .then((d) => setDirectory(Array.isArray(d.people) ? d.people : []))
+      .catch(() => setDirectory([]));
+  }, []);
 
-    // Break-glass offline demo trigger: bypasses fetch entirely
-    if (clean === "offline" || clean === "demo") {
-      setExploreData(heroFallbackData as ExploreData);
-      setHandleInput("mongodbtesthelix");
+  const matches = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q || q.length < 2) return [];
+    return directory
+      .filter((p) => p.handle.toLowerCase().includes(q) || (p.name || "").toLowerCase().includes(q))
+      .slice(0, 6);
+  }, [query, directory]);
+
+  const runQuery = async (rawHandle: string) => {
+    const handle = rawHandle.trim();
+    if (!handle) return;
+    setShowSuggestions(false);
+
+    if (handle.toLowerCase() === "offline") {
+      setData(heroFallbackData as ExploreData);
       setError(null);
+      setSelectedHandle(null);
       return;
     }
 
     setLoading(true);
     setError(null);
-
     try {
       const res = await fetch("/api/explore", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ handle: clean }),
+        body: JSON.stringify({ handle }),
       });
-
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || `HTTP ${res.status}`);
+      const body = await res.json();
+      if (!res.ok || !body?.target) {
+        throw new Error(body?.error || "No attendee found for that handle.");
       }
-
-      const data: ExploreData = await res.json();
-      if (data && data.target) {
-        setExploreData(data);
-      } else {
-        setExploreData(heroFallbackData as ExploreData);
-      }
+      setData(body);
+      setSelectedHandle(null);
     } catch (err: any) {
-      console.error("Explore fetch error, loading offline hero fallback:", err);
-      setExploreData(heroFallbackData as ExploreData);
-      setError(null);
+      setError(err?.message || "Couldn't load that query — showing offline demo data instead.");
+      setData(heroFallbackData as ExploreData);
     } finally {
       setLoading(false);
     }
   };
 
-  // Initial load on mount
   useEffect(() => {
-    let initialHandle = "langchain-ai/langgraph";
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      const urlHandle = params.get("handle");
-      if (urlHandle && urlHandle.trim()) {
-        initialHandle = urlHandle.trim();
-        setHandleInput(initialHandle);
-      }
-    }
-    loadGraph(initialHandle);
+    runQuery("langchain-ai/langgraph");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    loadGraph(handleInput);
+  const handleGraphNodeClick = (handle: string) => {
+    if (!data || handle === data.target.handle) return;
+    setSelectedHandle(handle);
+    cardRefs.current[handle]?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
 
-  const chosenCandidate = exploreData?.candidates?.find(
-    (c) => c?.handle?.toLowerCase() === exploreData?.chosenHandle?.toLowerCase()
-  ) || exploreData?.candidates?.[0];
-
   return (
-    <div
-      style={{
-        position: "relative",
-        width: "100vw",
-        height: "100vh",
-        overflow: "hidden",
-        background: "#050811",
-      }}
-    >
-      {/* React Flow Knowledge Graph Canvas Layer */}
-      <div style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", zIndex: 1 }}>
-        {exploreData && exploreData.target && (
-          <KnowledgeGraph
-            target={exploreData.target}
-            candidates={exploreData.candidates || []}
-            chosenHandle={exploreData.chosenHandle}
-            height="100%"
-          />
+    <main style={{ maxWidth: "880px", margin: "0 auto", padding: "1.5rem 1.25rem 4rem" }}>
+      {/* Header */}
+      <div style={{ marginBottom: "1.5rem" }}>
+        <Link href="/" style={{ color: "#9ca3af", fontSize: "0.85rem", display: "inline-flex", alignItems: "center", gap: "0.3rem", textDecoration: "none" }}>
+          <ArrowLeft size={14} /> Back to Home
+        </Link>
+        <h1 className="title" style={{ fontSize: "1.75rem", marginTop: "0.75rem", marginBottom: "0.35rem" }}>
+          Explore the Graph
+        </h1>
+        <p className="subtitle" style={{ marginBottom: 0 }}>
+          Ask who can unblock any project in the room. MongoDB finds the match, one AI call explains why.
+        </p>
+      </div>
+
+      {/* Search */}
+      <div style={{ position: "relative", marginBottom: "0.75rem" }}>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            runQuery(query);
+          }}
+          style={{ display: "flex", gap: "0.5rem" }}
+        >
+          <div style={{ position: "relative", flex: 1 }}>
+            <Search size={16} color="#6b7280" style={{ position: "absolute", left: "0.85rem", top: "50%", transform: "translateY(-50%)" }} />
+            <input
+              type="text"
+              className="input"
+              style={{ paddingLeft: "2.3rem" }}
+              placeholder="Type a GitHub handle or project, e.g. tokio-rs/tokio"
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setShowSuggestions(true);
+              }}
+              onFocus={() => setShowSuggestions(true)}
+              onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+            />
+          </div>
+          <button type="submit" className="btn-submit" disabled={loading} style={{ width: "auto", padding: "0 1.25rem" }}>
+            {loading ? <Loader2 size={16} className="spinner" /> : "Search"}
+          </button>
+        </form>
+
+        {/* Live autocomplete dropdown */}
+        {showSuggestions && matches.length > 0 && (
+          <div
+            style={{
+              position: "absolute",
+              top: "calc(100% + 0.35rem)",
+              left: 0,
+              right: 0,
+              background: "#111827",
+              border: "1px solid #374151",
+              borderRadius: "8px",
+              overflow: "hidden",
+              zIndex: 30,
+              boxShadow: "0 10px 25px -5px rgba(0,0,0,0.5)",
+            }}
+          >
+            {matches.map((p) => (
+              <button
+                key={p.handle}
+                onMouseDown={() => {
+                  setQuery(p.handle);
+                  runQuery(p.handle);
+                }}
+                style={{
+                  display: "flex",
+                  width: "100%",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  padding: "0.55rem 0.85rem",
+                  background: "transparent",
+                  border: "none",
+                  borderBottom: "1px solid #1f2937",
+                  color: "#f3f4f6",
+                  fontSize: "0.85rem",
+                  cursor: "pointer",
+                  textAlign: "left",
+                }}
+              >
+                <span>{p.name}</span>
+                <span style={{ color: "#6b7280", fontSize: "0.78rem" }}>@{p.handle}</span>
+              </button>
+            ))}
+          </div>
         )}
       </div>
 
-      {/* TOP OVERLAY BAR */}
-      <div
-        style={{
-          position: "absolute",
-          top: "1.25rem",
-          left: "50%",
-          transform: "translateX(-50%)",
-          zIndex: 20,
-          width: "90%",
-          maxWidth: "780px",
-          display: "flex",
-          flexDirection: "column",
-          gap: "0.75rem",
-        }}
-      >
-        {/* Navigation & Controls Container */}
-        <div
+      {/* Suggestions + offline demo */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem", alignItems: "center", marginBottom: "2rem" }}>
+        <span style={{ fontSize: "0.78rem", color: "#6b7280" }}>Try:</span>
+        {SUGGESTED.map((s) => (
+          <button
+            key={s}
+            onClick={() => {
+              setQuery(s);
+              runQuery(s);
+            }}
+            style={{
+              background: "#161e2e",
+              border: "1px solid #374151",
+              color: "#cbd5e1",
+              fontSize: "0.75rem",
+              padding: "0.2rem 0.65rem",
+              borderRadius: "9999px",
+              cursor: "pointer",
+            }}
+          >
+            @{s}
+          </button>
+        ))}
+        <button
+          onClick={() => runQuery("offline")}
           style={{
-            background: "rgba(15, 23, 42, 0.92)",
-            backdropFilter: "blur(14px)",
-            border: "1px solid rgba(51, 65, 85, 0.8)",
-            borderRadius: "14px",
-            padding: "0.75rem 1.1rem",
-            boxShadow: "0 15px 30px -5px rgba(0, 0, 0, 0.7)",
-            display: "flex",
-            flexWrap: "wrap",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: "0.75rem",
+            marginLeft: "auto",
+            background: "transparent",
+            border: "1px dashed #334155",
+            color: "#64748b",
+            fontSize: "0.75rem",
+            padding: "0.2rem 0.65rem",
+            borderRadius: "9999px",
+            cursor: "pointer",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-            <Link
-              href="/"
-              style={{
-                color: "#94a3af",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "0.3rem",
-                fontSize: "0.85rem",
-                textDecoration: "none",
-                fontWeight: 600,
-              }}
-            >
-              <ArrowLeft size={15} /> Back
-            </Link>
-
-            <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", color: "#ffffff", fontWeight: 700, fontSize: "0.95rem" }}>
-              <Compass size={18} color="#00ed64" /> MongoMatch Knowledge Graph
-            </div>
-          </div>
-
-          {/* Search Form */}
-          <form
-            onSubmit={handleSearchSubmit}
-            style={{ display: "flex", alignItems: "center", gap: "0.4rem", flex: "1 1 240px", maxWidth: "360px" }}
-          >
-            <input
-              type="text"
-              placeholder="Search handle (e.g. langchain-ai/langgraph)..."
-              value={handleInput}
-              onChange={(e) => setHandleInput(e.target.value)}
-              style={{
-                flex: 1,
-                background: "#0b0f19",
-                border: "1px solid #334155",
-                borderRadius: "8px",
-                color: "#f8fafc",
-                padding: "0.45rem 0.75rem",
-                fontSize: "0.85rem",
-                outline: "none",
-              }}
-            />
-            <button
-              type="submit"
-              disabled={loading}
-              style={{
-                background: "#00ed64",
-                border: "none",
-                color: "#001e00",
-                fontWeight: 700,
-                padding: "0.45rem 0.85rem",
-                borderRadius: "8px",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: "0.3rem",
-                fontSize: "0.82rem",
-                boxShadow: "0 0 12px rgba(0, 237, 100, 0.4)",
-              }}
-            >
-              <Search size={14} />
-              {loading ? "..." : "Traverse"}
-            </button>
-          </form>
-        </div>
-
-        {/* Quick-Pick Handle Chips */}
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.45rem", justifyContent: "center" }}>
-          {SAMPLE_CHIPS.map((chip) => (
-            <button
-              key={chip}
-              onClick={() => {
-                setHandleInput(chip);
-                loadGraph(chip);
-              }}
-              style={{
-                background: "rgba(15, 23, 42, 0.82)",
-                backdropFilter: "blur(8px)",
-                border: `1px solid ${chip === "offline" ? "rgba(0, 237, 100, 0.5)" : "rgba(51, 65, 85, 0.7)"}`,
-                color: chip === "offline" ? "#00ed64" : "#cbd5e1",
-                fontSize: "0.75rem",
-                padding: "0.25rem 0.7rem",
-                borderRadius: "9999px",
-                cursor: "pointer",
-                fontWeight: chip === "offline" ? 700 : 500,
-              }}
-            >
-              {chip === "offline" ? "⚡ Offline Break-Glass" : `@${chip}`}
-            </button>
-          ))}
-        </div>
+          ⚡ Use offline demo data
+        </button>
       </div>
 
-      {/* Error state */}
       {error && (
         <div
           style={{
-            position: "absolute",
-            top: "7.5rem",
-            left: "50%",
-            transform: "translateX(-50%)",
-            zIndex: 20,
-            background: "rgba(239, 68, 68, 0.15)",
+            display: "flex",
+            alignItems: "center",
+            gap: "0.5rem",
+            background: "rgba(239,68,68,0.1)",
             border: "1px solid #ef4444",
             color: "#fca5a5",
-            padding: "0.6rem 1.2rem",
+            padding: "0.6rem 0.9rem",
             borderRadius: "8px",
             fontSize: "0.85rem",
+            marginBottom: "1.5rem",
           }}
         >
-          {error}
+          <AlertCircle size={15} /> {error}
         </div>
       )}
 
-      {/* BOTTOM NARRATION OVERLAY */}
-      {exploreData && exploreData.target && (
-        <div
-          style={{
-            position: "absolute",
-            bottom: "1.5rem",
-            left: "50%",
-            transform: "translateX(-50%)",
-            zIndex: 20,
-            width: "90%",
-            maxWidth: "780px",
-            background: "rgba(11, 15, 25, 0.94)",
-            backdropFilter: "blur(18px)",
-            border: "1px solid rgba(0, 237, 100, 0.35)",
-            borderRadius: "16px",
-            padding: "1.25rem 1.5rem",
-            boxShadow: "0 25px 40px -10px rgba(0, 0, 0, 0.85)",
-          }}
-        >
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.6rem" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-              <div
+      {loading && !data && (
+        <div style={{ textAlign: "center", padding: "3rem 0", color: "#6b7280" }}>
+          <Loader2 size={24} className="spinner" style={{ margin: "0 auto 0.75rem" }} />
+          Querying the graph…
+        </div>
+      )}
+
+      {data && (
+        <>
+          {/* Target summary */}
+          <div style={{ background: "#111827", border: "1px solid #374151", borderRadius: "10px", padding: "1.1rem 1.25rem", marginBottom: "1.25rem" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "0.75rem", flexWrap: "wrap" }}>
+              <div>
+                <div style={{ fontSize: "0.75rem", color: "#6b7280", fontWeight: 600, textTransform: "uppercase", marginBottom: "0.2rem" }}>
+                  Querying for
+                </div>
+                <Link href={`/${data.target.handle}`} style={{ color: "#ffffff", fontSize: "1.15rem", fontWeight: 700, textDecoration: "none" }}>
+                  {data.target.name} <span style={{ color: "#6b7280", fontWeight: 500 }}>@{data.target.handle}</span>
+                </Link>
+              </div>
+              <span
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
-                  gap: "0.35rem",
-                  background: "rgba(0, 237, 100, 0.15)",
-                  border: "1px solid rgba(0, 237, 100, 0.35)",
+                  gap: "0.3rem",
+                  background: "rgba(0,237,100,0.1)",
+                  border: "1px solid rgba(0,237,100,0.3)",
                   color: "#00ed64",
                   fontSize: "0.75rem",
-                  fontWeight: 800,
+                  fontWeight: 600,
                   padding: "0.2rem 0.6rem",
                   borderRadius: "9999px",
                 }}
               >
-                <Cpu size={12} /> ONSTAGE AI MATCHMAKER
-              </div>
-
-              {chosenCandidate && (
-                <Link
-                  href={`/${chosenCandidate.handle}`}
-                  style={{
-                    color: "#ffffff",
-                    fontWeight: 700,
-                    fontSize: "0.95rem",
-                    textDecoration: "none",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.3rem",
-                  }}
-                >
-                  <User size={14} color="#00ed64" /> {chosenCandidate.name || chosenCandidate.handle} (@{chosenCandidate.handle})
-                </Link>
-              )}
+                <Users size={12} /> {data.candidates.length} candidates evaluated
+              </span>
             </div>
-
-            {chosenCandidate?.evidenceRepo && (
-              <a
-                href={chosenCandidate.evidenceRepo.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{
-                  color: "#fbbf24",
-                  fontSize: "0.8rem",
-                  fontWeight: 600,
-                  textDecoration: "none",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "0.3rem",
-                }}
-              >
-                <Code size={13} /> {chosenCandidate.evidenceRepo.name} <ExternalLink size={11} />
-              </a>
+            {data.target.description && (
+              <p style={{ color: "#9ca3af", fontSize: "0.88rem", marginTop: "0.6rem", lineHeight: 1.45 }}>{data.target.description}</p>
             )}
           </div>
 
-          {/* Narration Text */}
-          <p style={{ color: "#f8fafc", fontSize: "0.95rem", lineHeight: 1.5, margin: 0 }}>
-            {exploreData.narration}
-          </p>
-
-          {/* Candidate overview count */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "0.75rem", fontSize: "0.75rem", color: "#64748b", borderTop: "1px solid #1e293b", paddingTop: "0.5rem" }}>
-            <span>
-              Target: <strong style={{ color: "#00ed64" }}>@{exploreData.target?.handle || "attendee"}</strong> &middot; Evaluated {(exploreData.candidates || []).length} candidates
-            </span>
-            <span style={{ color: "#00ed64", fontWeight: 600 }}>✦ Click any node card to navigate</span>
+          {/* AI narration */}
+          <div
+            style={{
+              background: "rgba(0,237,100,0.06)",
+              border: "1px solid rgba(0,237,100,0.3)",
+              borderRadius: "10px",
+              padding: "1.1rem 1.25rem",
+              marginBottom: "1.5rem",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", color: "#00ed64", fontSize: "0.78rem", fontWeight: 700, marginBottom: "0.5rem" }}>
+              <Sparkles size={14} /> AI INTRODUCTION{data.degraded ? " (offline template)" : ""}
+            </div>
+            <p style={{ color: "#f3f4f6", fontSize: "0.98rem", lineHeight: 1.55, margin: 0 }}>{data.narration}</p>
           </div>
-        </div>
+
+          {/* Graph */}
+          <div style={{ marginBottom: "1.75rem" }}>
+            <h2 style={{ fontSize: "0.95rem", fontWeight: 700, color: "#e5e7eb", marginBottom: "0.5rem" }}>
+              How MongoDB found this
+            </h2>
+            <div
+              style={{
+                height: "380px",
+                width: "100%",
+                borderRadius: "12px",
+                border: "1px solid #334155",
+                overflow: "hidden",
+              }}
+            >
+              <KnowledgeGraph
+                target={data.target}
+                candidates={data.candidates}
+                chosenHandle={data.chosenHandle}
+                height="100%"
+                onNodeClick={handleGraphNodeClick}
+              />
+            </div>
+            <p style={{ fontSize: "0.75rem", color: "#6b7280", marginTop: "0.4rem" }}>
+              Click a person in the graph to jump to their card below.
+            </p>
+          </div>
+
+          {/* Ranked matches */}
+          <div>
+            <h2 style={{ fontSize: "0.95rem", fontWeight: 700, color: "#e5e7eb", marginBottom: "0.75rem" }}>
+              Ranked matches
+            </h2>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.7rem" }}>
+              {data.candidates.map((c, idx) => {
+                const isChosen = c.handle.toLowerCase() === data.chosenHandle?.toLowerCase();
+                const isSelected = selectedHandle === c.handle;
+                return (
+                  <div
+                    key={c.handle}
+                    ref={(el) => {
+                      cardRefs.current[c.handle] = el;
+                    }}
+                    style={{
+                      background: "#111827",
+                      border: `1px solid ${isSelected ? "#00ed64" : isChosen ? "rgba(0,237,100,0.4)" : "#374151"}`,
+                      borderRadius: "10px",
+                      padding: "0.9rem 1.1rem",
+                      transition: "border-color 0.2s",
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "0.6rem", flexWrap: "wrap" }}>
+                      <div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+                          <span style={{ color: "#6b7280", fontSize: "0.75rem", fontWeight: 700 }}>#{idx + 1}</span>
+                          <span style={{ color: "#ffffff", fontWeight: 700, fontSize: "0.98rem" }}>{c.name}</span>
+                          {isChosen && (
+                            <span style={{ background: "rgba(0,237,100,0.15)", color: "#00ed64", fontSize: "0.68rem", fontWeight: 700, padding: "0.1rem 0.5rem", borderRadius: "9999px" }}>
+                              AI PICK
+                            </span>
+                          )}
+                        </div>
+                        {c.email && (
+                          <div style={{ display: "flex", alignItems: "center", gap: "0.3rem", color: "#9ca3af", fontSize: "0.8rem", marginTop: "0.2rem" }}>
+                            <Mail size={11} /> {c.email}
+                          </div>
+                        )}
+                      </div>
+                      <Link
+                        href={`/${c.handle}`}
+                        style={{ color: "#00ed64", fontSize: "0.8rem", fontWeight: 600, textDecoration: "none", whiteSpace: "nowrap" }}
+                      >
+                        View profile →
+                      </Link>
+                    </div>
+
+                    {c.reason && (
+                      <div style={{ marginTop: "0.5rem" }}>
+                        <span
+                          style={{
+                            background: "rgba(59,130,246,0.1)",
+                            border: "1px solid rgba(59,130,246,0.3)",
+                            color: "#60a5fa",
+                            fontSize: "0.75rem",
+                            padding: "0.15rem 0.55rem",
+                            borderRadius: "9999px",
+                          }}
+                        >
+                          {c.reason.replace(/^(topic|ai|stack|role|lang):/, "")}
+                        </span>
+                      </div>
+                    )}
+
+                    {c.evidenceRepo && (
+                      <a
+                        href={c.evidenceRepo.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          marginTop: "0.6rem",
+                          padding: "0.5rem 0.7rem",
+                          background: "#0b0f19",
+                          border: "1px solid #1f2937",
+                          borderRadius: "6px",
+                          textDecoration: "none",
+                        }}
+                      >
+                        <span style={{ color: "#00ed64", fontSize: "0.82rem", fontWeight: 600, display: "flex", alignItems: "center", gap: "0.3rem" }}>
+                          {c.evidenceRepo.name} <ExternalLink size={11} />
+                        </span>
+                        {typeof c.evidenceRepo.stars === "number" && c.evidenceRepo.stars > 0 && (
+                          <span style={{ display: "flex", alignItems: "center", gap: "0.2rem", color: "#fbbf24", fontSize: "0.75rem" }}>
+                            <Star size={11} fill="#fbbf24" /> {c.evidenceRepo.stars.toLocaleString()}
+                          </span>
+                        )}
+                      </a>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </>
       )}
-    </div>
+    </main>
   );
 }
-
