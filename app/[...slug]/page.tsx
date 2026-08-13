@@ -16,7 +16,11 @@ import {
   GitBranch,
   UserCheck,
   Star,
+  Compass,
+  Network,
 } from "lucide-react";
+
+import KnowledgeGraph, { GraphNode, GraphLink } from "@/components/KnowledgeGraph";
 
 interface RepoDoc {
   name: string;
@@ -74,6 +78,7 @@ export default function AttendeeDetailPage({
   const [copied, setCopied] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [notFound, setNotFound] = useState(false);
+  const [showGraph, setShowGraph] = useState(true);
 
   const fetchPerson = async (isManual = false) => {
     if (isManual) setRefreshing(true);
@@ -111,6 +116,85 @@ export default function AttendeeDetailPage({
     }
   };
 
+  // Build Graph Nodes and Links for this specific attendee
+  const buildProfileGraph = (): { nodes: GraphNode[]; links: GraphLink[] } => {
+    if (!person) return { nodes: [], links: [] };
+
+    const nodes: GraphNode[] = [];
+    const links: GraphLink[] = [];
+    const tagSet = new Set<string>();
+
+    // 1. Target Node
+    nodes.push({
+      id: person.handle,
+      handle: person.handle,
+      name: person.name || person.handle,
+      type: "you",
+      isChosen: true,
+    });
+
+    matches.forEach((m, idx) => {
+      const isTop = idx === 0;
+
+      nodes.push({
+        id: m.handle,
+        handle: m.handle,
+        name: m.name || m.handle,
+        type: "match",
+        isChosen: isTop,
+        reason: m.reason,
+      });
+
+      const shared = m.sharedTags || [];
+      shared.forEach((tag) => {
+        const tagId = `tag:${tag}`;
+        const isPathTag = isTop && (m.reason === tag || shared.length === 1);
+
+        if (!tagSet.has(tagId)) {
+          tagSet.add(tagId);
+          nodes.push({
+            id: tagId,
+            name: `#${tag}`,
+            type: "tag",
+            isChosen: isPathTag,
+          });
+
+          links.push({
+            source: person.handle,
+            target: tagId,
+            isChosen: isPathTag,
+          });
+        }
+
+        links.push({
+          source: tagId,
+          target: m.handle,
+          isChosen: isPathTag,
+        });
+      });
+
+      // Evidence Repo Node for top match
+      if (isTop && m.evidenceRepo) {
+        const repoId = `repo:${m.evidenceRepo.name}`;
+        nodes.push({
+          id: repoId,
+          name: m.evidenceRepo.name,
+          type: "repo",
+          url: m.evidenceRepo.url,
+          isChosen: true,
+        });
+
+        links.push({
+          source: m.handle,
+          target: repoId,
+          isChosen: true,
+        });
+      }
+    });
+
+    return { nodes, links };
+  };
+
   if (loading) {
     return (
       <main className="wrapper" style={{ textAlign: "center", paddingTop: "3rem" }}>
@@ -134,21 +218,22 @@ export default function AttendeeDetailPage({
 
   const tags = person.tags || [];
   const repos = person.repos || [];
+  const graphData = buildProfileGraph();
 
   return (
-    <main className="wrapper" style={{ maxWidth: "560px" }}>
+    <main className="wrapper" style={{ maxWidth: "620px" }}>
       {/* Top action bar */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem" }}>
-        <Link href="/" style={{ color: "#9ca3af", fontSize: "0.85rem", display: "flex", alignItems: "center", gap: "0.3rem" }}>
+        <Link href="/" style={{ color: "#94a3af", fontSize: "0.85rem", display: "flex", alignItems: "center", gap: "0.3rem" }}>
           <ArrowLeft size={14} /> Back to Home
         </Link>
         <div style={{ display: "flex", gap: "0.5rem" }}>
           <button
             onClick={() => fetchPerson(true)}
             style={{
-              background: "#1f2937",
-              border: "1px solid #374151",
-              color: "#f3f4f6",
+              background: "#1e293b",
+              border: "1px solid #334155",
+              color: "#f8fafc",
               padding: "0.4rem 0.75rem",
               borderRadius: "6px",
               fontSize: "0.8rem",
@@ -164,9 +249,9 @@ export default function AttendeeDetailPage({
           <button
             onClick={copyUrl}
             style={{
-              background: "#1f2937",
-              border: "1px solid #374151",
-              color: "#f3f4f6",
+              background: "#1e293b",
+              border: "1px solid #334155",
+              color: "#f8fafc",
               padding: "0.4rem 0.75rem",
               borderRadius: "6px",
               fontSize: "0.8rem",
@@ -236,7 +321,7 @@ export default function AttendeeDetailPage({
             </h1>
             
             <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem", marginTop: "0.35rem", fontSize: "0.85rem" }}>
-              <span style={{ color: "#9ca3af", display: "flex", alignItems: "center", gap: "0.3rem" }}>
+              <span style={{ color: "#94a3af", display: "flex", alignItems: "center", gap: "0.3rem" }}>
                 <Mail size={13} color="#00ed64" /> {person.email}
               </span>
               
@@ -271,33 +356,75 @@ export default function AttendeeDetailPage({
             borderLeft: "3px solid #00ed64",
           }}
         >
-          <div style={{ fontSize: "0.78rem", color: "#9ca3af", fontWeight: 600, textTransform: "uppercase", marginBottom: "0.25rem" }}>
+          <div style={{ fontSize: "0.78rem", color: "#94a3af", fontWeight: 600, textTransform: "uppercase", marginBottom: "0.25rem" }}>
             What I&apos;m building / need unblocking on:
           </div>
-          <div style={{ color: "#f3f4f6", fontSize: "0.95rem", lineHeight: 1.45 }}>
+          <div style={{ color: "#f8fafc", fontSize: "0.95rem", lineHeight: 1.45 }}>
             {person.description}
           </div>
         </div>
       </div>
 
-      {/* TOP UNBLOCKER MATCHES SECTION (PLAN_4) */}
+      {/* INTERACTIVE KNOWLEDGE GRAPH VIEW */}
+      {person.enriched && graphData.nodes.length > 1 && (
+        <div style={{ marginBottom: "1.75rem" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
+            <h2 style={{ fontSize: "1.05rem", fontWeight: 700, color: "#ffffff", display: "flex", alignItems: "center", gap: "0.45rem" }}>
+              <Network size={18} color="#00ed64" /> Live Unblocker Graph
+            </h2>
+            <Link
+              href="/explore"
+              style={{
+                fontSize: "0.8rem",
+                color: "#00ed64",
+                textDecoration: "none",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.25rem",
+              }}
+            >
+              <Compass size={13} /> Open Fullscreen Graph
+            </Link>
+          </div>
+
+          <div
+            style={{
+              height: "280px",
+              width: "100%",
+              borderRadius: "12px",
+              border: "1px solid #334155",
+              overflow: "hidden",
+              background: "#050811",
+              boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.4)",
+            }}
+          >
+            <KnowledgeGraph
+              nodes={graphData.nodes}
+              links={graphData.links}
+              height={280}
+              interactive={true}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* TOP UNBLOCKER MATCHES SECTION */}
       <div style={{ marginBottom: "1.75rem" }}>
         <h2 style={{ fontSize: "1.1rem", fontWeight: 700, color: "#ffffff", marginBottom: "0.85rem", display: "flex", alignItems: "center", gap: "0.45rem" }}>
           <UserCheck size={18} color="#00ed64" /> Top People to Unblock You
         </h2>
 
         {!person.enriched ? (
-          <div style={{ background: "#111827", border: "1px dashed #374151", borderRadius: "8px", padding: "1.25rem", textAlign: "center", color: "#9ca3af", fontSize: "0.9rem" }}>
+          <div style={{ background: "#111827", border: "1px dashed #374151", borderRadius: "8px", padding: "1.25rem", textAlign: "center", color: "#94a3af", fontSize: "0.9rem" }}>
             ⏳ Reading your GitHub profile... matches will compute once indexed.
           </div>
         ) : matches.length === 0 ? (
-          <div style={{ background: "#111827", border: "1px dashed #374151", borderRadius: "8px", padding: "1.25rem", textAlign: "center", color: "#9ca3af", fontSize: "0.9rem" }}>
+          <div style={{ background: "#111827", border: "1px dashed #374151", borderRadius: "8px", padding: "1.25rem", textAlign: "center", color: "#94a3af", fontSize: "0.9rem" }}>
             No matches yet — check back as more people join.
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
             {matches.map((m, idx) => {
-              // Strip prefix for display (e.g. "stack:rust" -> "rust", "ai:llm" -> "llm")
               const cleanReason = m.reason ? m.reason.replace(/^(topic|ai|stack|role|lang):/, "") : "Domain Match";
 
               return (
@@ -321,7 +448,7 @@ export default function AttendeeDetailPage({
                           href={`/${m.handle}`}
                           style={{
                             fontSize: "0.8rem",
-                            color: "#9ca3af",
+                            color: "#94a3af",
                             textDecoration: "none",
                           }}
                         >
@@ -388,7 +515,7 @@ export default function AttendeeDetailPage({
                       </div>
 
                       {m.evidenceRepo.description && (
-                        <p style={{ fontSize: "0.78rem", color: "#9ca3af", marginTop: "0.25rem", lineHeight: 1.35 }}>
+                        <p style={{ fontSize: "0.78rem", color: "#94a3af", marginTop: "0.25rem", lineHeight: 1.35 }}>
                           {m.evidenceRepo.description}
                         </p>
                       )}
@@ -408,7 +535,7 @@ export default function AttendeeDetailPage({
         </h2>
 
         {tags.length === 0 ? (
-          <div style={{ background: "#111827", border: "1px dashed #374151", borderRadius: "8px", padding: "1rem", textAlign: "center", color: "#9ca3af", fontSize: "0.88rem" }}>
+          <div style={{ background: "#111827", border: "1px dashed #374151", borderRadius: "8px", padding: "1rem", textAlign: "center", color: "#94a3af", fontSize: "0.88rem" }}>
             {person.enriched ? "No exact tags generated yet." : "⏳ Graph tags will appear once the enrichment worker runs."}
           </div>
         ) : (
@@ -490,14 +617,14 @@ export default function AttendeeDetailPage({
                   </a>
 
                   {repo.language && (
-                    <span style={{ fontSize: "0.75rem", color: "#9ca3af", background: "#1f2937", padding: "0.15rem 0.45rem", borderRadius: "4px" }}>
+                    <span style={{ fontSize: "0.75rem", color: "#94a3af", background: "#1f2937", padding: "0.15rem 0.45rem", borderRadius: "4px" }}>
                       {repo.language}
                     </span>
                   )}
                 </div>
 
                 {repo.description && (
-                  <p style={{ fontSize: "0.82rem", color: "#9ca3af", marginTop: "0.35rem", lineHeight: 1.35 }}>
+                  <p style={{ fontSize: "0.82rem", color: "#94a3af", marginTop: "0.35rem", lineHeight: 1.35 }}>
                     {repo.description}
                   </p>
                 )}
@@ -515,7 +642,7 @@ export default function AttendeeDetailPage({
           background: "rgba(0, 237, 100, 0.05)",
           border: "1px dashed rgba(0, 237, 100, 0.2)",
           borderRadius: "8px",
-          color: "#9ca3af",
+          color: "#94a3af",
           fontSize: "0.82rem",
         }}
       >

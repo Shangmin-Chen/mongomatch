@@ -1,12 +1,11 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import dynamic from "next/dynamic";
+import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   Search,
-  Sparkles,
   ExternalLink,
   Code,
   User,
@@ -15,9 +14,7 @@ import {
 } from "lucide-react";
 
 import heroFallbackData from "@/lib/hero-fallback.json";
-
-// Dynamically import 3D Force Graph to avoid SSR WebGL issues
-const ForceGraph3D = dynamic(() => import("react-force-graph-3d"), { ssr: false });
+import KnowledgeGraph, { GraphNode, GraphLink } from "@/components/KnowledgeGraph";
 
 interface CandidateDoc {
   handle: string;
@@ -55,16 +52,17 @@ const SAMPLE_CHIPS = [
   "mongodbtestollama",
   "mongodbtestpgvector",
   "mongodbtestripgrep",
+  "hwchase17/langchain",
   "offline",
 ];
 
 export default function ExplorePage() {
+  const router = useRouter();
   const [handleInput, setHandleInput] = useState("mongodbtesthelix");
   const [loading, setLoading] = useState(false);
   const [exploreData, setExploreData] = useState<ExploreData | null>(heroFallbackData as ExploreData);
   const [error, setError] = useState<string | null>(null);
-  const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
-  const graphRef = useRef<any>(null);
+  const [dimensions, setDimensions] = useState({ width: 1200, height: 800 });
 
   // Responsive window resize listener
   useEffect(() => {
@@ -108,7 +106,6 @@ export default function ExplorePage() {
       setExploreData(data);
     } catch (err: any) {
       console.error("Explore fetch error, loading offline hero fallback:", err);
-      // If network fails completely at demo time, gracefully fallback to hero data
       setExploreData(heroFallbackData as ExploreData);
       setError(null);
     } finally {
@@ -127,23 +124,23 @@ export default function ExplorePage() {
   };
 
   // Construct Force Graph Node/Link Data
-  const buildGraphData = () => {
+  const buildGraphData = (): { nodes: GraphNode[]; links: GraphLink[] } => {
     if (!exploreData || !exploreData.target) {
       return { nodes: [], links: [] };
     }
 
     const { target, candidates, chosenHandle } = exploreData;
-    const nodes: any[] = [];
-    const links: any[] = [];
+    const nodes: GraphNode[] = [];
+    const links: GraphLink[] = [];
     const tagSet = new Set<string>();
 
     // 1. Target Node
     nodes.push({
       id: target.handle,
-      name: `Target: ${target.name} (@${target.handle})`,
+      handle: target.handle,
+      name: target.name || target.handle,
       type: "you",
-      color: "#00ed64",
-      val: 14,
+      isChosen: true,
     });
 
     const chosenCandidate = candidates.find(
@@ -156,31 +153,33 @@ export default function ExplorePage() {
 
       nodes.push({
         id: candidate.handle,
-        name: `@${candidate.handle} (${candidate.name})`,
+        handle: candidate.handle,
+        name: candidate.name || candidate.handle,
         type: "match",
-        color: isChosen ? "#00ed64" : "#9ca3af",
-        val: isChosen ? 10 : 6,
+        isChosen,
+        reason: candidate.reason,
       });
 
       // Tags shared with target
       const shared = candidate.sharedTags || [];
       shared.forEach((tag) => {
         const tagId = `tag:${tag}`;
+        const isPathTag = isChosen && (candidate.reason === tag || shared.length === 1);
+
         if (!tagSet.has(tagId)) {
           tagSet.add(tagId);
           nodes.push({
             id: tagId,
             name: `#${tag}`,
             type: "tag",
-            color: isChosen && candidate.reason === tag ? "#00ed64" : "#3b82f6",
-            val: 5,
+            isChosen: isPathTag,
           });
 
           // Link from Target to Tag
           links.push({
             source: target.handle,
             target: tagId,
-            isChosen: isChosen && candidate.reason === tag,
+            isChosen: isPathTag,
           });
         }
 
@@ -188,7 +187,7 @@ export default function ExplorePage() {
         links.push({
           source: tagId,
           target: candidate.handle,
-          isChosen: isChosen && candidate.reason === tag,
+          isChosen: isPathTag,
         });
       });
     });
@@ -198,10 +197,10 @@ export default function ExplorePage() {
       const repoId = `repo:${chosenCandidate.evidenceRepo.name}`;
       nodes.push({
         id: repoId,
-        name: `Repo: ${chosenCandidate.evidenceRepo.name}`,
+        name: chosenCandidate.evidenceRepo.name,
         type: "repo",
-        color: "#fbbf24",
-        val: 8,
+        url: chosenCandidate.evidenceRepo.url,
+        isChosen: true,
       });
 
       links.push({
@@ -214,7 +213,7 @@ export default function ExplorePage() {
     return { nodes, links };
   };
 
-  const graphData = buildGraphData();
+  const { nodes, links } = buildGraphData();
   const chosenCandidate = exploreData?.candidates.find(
     (c) => c.handle.toLowerCase() === exploreData?.chosenHandle.toLowerCase()
   );
@@ -229,27 +228,15 @@ export default function ExplorePage() {
         background: "#050811",
       }}
     >
-      {/* 3D WebGL Canvas Layer */}
+      {/* 2D Force Graph Canvas Layer */}
       <div style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", zIndex: 1 }}>
-        {graphData.nodes.length > 0 && (
-          <ForceGraph3D
-            ref={graphRef}
+        {nodes.length > 0 && (
+          <KnowledgeGraph
+            nodes={nodes}
+            links={links}
             width={dimensions.width}
             height={dimensions.height}
-            graphData={graphData}
-            backgroundColor="#050811"
-            nodeLabel="name"
-            nodeColor={(node: any) => node.color}
-            nodeVal={(node: any) => node.val}
-            linkColor={(link: any) =>
-              link.isChosen ? "#00ed64" : "rgba(255, 255, 255, 0.12)"
-            }
-            linkWidth={(link: any) => (link.isChosen ? 2.5 : 0.6)}
-            linkDirectionalParticles={(link: any) => (link.isChosen ? 4 : 0)}
-            linkDirectionalParticleSpeed={0.008}
-            linkDirectionalParticleColor={() => "#00ed64"}
-            linkDirectionalParticleWidth={2}
-            showNavInfo={false}
+            interactive={true}
           />
         )}
       </div>
@@ -261,7 +248,7 @@ export default function ExplorePage() {
           top: "1.25rem",
           left: "50%",
           transform: "translateX(-50%)",
-          zIndex: 10,
+          zIndex: 20,
           width: "90%",
           maxWidth: "760px",
           display: "flex",
@@ -272,12 +259,12 @@ export default function ExplorePage() {
         {/* Navigation & Controls Container */}
         <div
           style={{
-            background: "rgba(17, 24, 39, 0.85)",
+            background: "rgba(15, 23, 42, 0.88)",
             backdropFilter: "blur(12px)",
-            border: "1px solid rgba(55, 65, 81, 0.8)",
+            border: "1px solid rgba(51, 65, 85, 0.8)",
             borderRadius: "12px",
             padding: "0.75rem 1rem",
-            boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.5)",
+            boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.6)",
             display: "flex",
             flexWrap: "wrap",
             alignItems: "center",
@@ -289,7 +276,7 @@ export default function ExplorePage() {
             <Link
               href="/"
               style={{
-                color: "#9ca3af",
+                color: "#94a3b8",
                 display: "inline-flex",
                 alignItems: "center",
                 gap: "0.3rem",
@@ -301,7 +288,7 @@ export default function ExplorePage() {
             </Link>
 
             <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", color: "#ffffff", fontWeight: 700, fontSize: "0.95rem" }}>
-              <Compass size={18} color="#00ed64" /> MongoMatch 3D Graph
+              <Compass size={18} color="#00ed64" /> MongoMatch Live Graph
             </div>
           </div>
 
@@ -318,9 +305,9 @@ export default function ExplorePage() {
               style={{
                 flex: 1,
                 background: "#0b0f19",
-                border: "1px solid #374151",
+                border: "1px solid #334155",
                 borderRadius: "6px",
-                color: "#f3f4f6",
+                color: "#f8fafc",
                 padding: "0.4rem 0.65rem",
                 fontSize: "0.85rem",
                 outline: "none",
@@ -359,17 +346,18 @@ export default function ExplorePage() {
                 loadGraph(chip);
               }}
               style={{
-                background: "rgba(17, 24, 39, 0.7)",
+                background: "rgba(15, 23, 42, 0.75)",
                 backdropFilter: "blur(6px)",
-                border: "1px solid rgba(55, 65, 81, 0.6)",
-                color: "#d1d5db",
+                border: "1px solid rgba(51, 65, 85, 0.7)",
+                color: chip === "offline" ? "#00ed64" : "#cbd5e1",
                 fontSize: "0.75rem",
                 padding: "0.2rem 0.6rem",
                 borderRadius: "9999px",
                 cursor: "pointer",
+                fontWeight: chip === "offline" ? 700 : 500,
               }}
             >
-              @{chip}
+              {chip === "offline" ? "⚡ Offline Break-Glass" : `@${chip}`}
             </button>
           ))}
         </div>
@@ -383,7 +371,7 @@ export default function ExplorePage() {
             top: "7rem",
             left: "50%",
             transform: "translateX(-50%)",
-            zIndex: 10,
+            zIndex: 20,
             background: "rgba(239, 68, 68, 0.15)",
             border: "1px solid #ef4444",
             color: "#fca5a5",
@@ -404,12 +392,12 @@ export default function ExplorePage() {
             bottom: "1.5rem",
             left: "50%",
             transform: "translateX(-50%)",
-            zIndex: 10,
+            zIndex: 20,
             width: "90%",
             maxWidth: "760px",
-            background: "rgba(11, 15, 25, 0.9)",
+            background: "rgba(11, 15, 25, 0.92)",
             backdropFilter: "blur(16px)",
-            border: "1px solid rgba(0, 237, 100, 0.3)",
+            border: "1px solid rgba(0, 237, 100, 0.35)",
             borderRadius: "14px",
             padding: "1.25rem 1.5rem",
             boxShadow: "0 20px 35px -10px rgba(0, 0, 0, 0.8)",
@@ -473,16 +461,16 @@ export default function ExplorePage() {
           </div>
 
           {/* Narration Text */}
-          <p style={{ color: "#f3f4f6", fontSize: "0.95rem", lineHeight: 1.5, margin: 0 }}>
+          <p style={{ color: "#f8fafc", fontSize: "0.95rem", lineHeight: 1.5, margin: 0 }}>
             {exploreData.narration}
           </p>
 
           {/* Candidate overview count */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "0.75rem", fontSize: "0.75rem", color: "#6b7280", borderTop: "1px solid #1f2937", paddingTop: "0.5rem" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "0.75rem", fontSize: "0.75rem", color: "#64748b", borderTop: "1px solid #1e293b", paddingTop: "0.5rem" }}>
             <span>
               Target: <strong style={{ color: "#00ed64" }}>@{exploreData.target.handle}</strong> &middot; Evaluated {exploreData.candidates.length} graph candidates
             </span>
-            <span>Highlighted Path: Green Particle Flow</span>
+            <span style={{ color: "#00ed64" }}>✦ Click node to view profile</span>
           </div>
         </div>
       )}
