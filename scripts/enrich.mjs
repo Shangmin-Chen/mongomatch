@@ -8,6 +8,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { deriveTags, deriveText } from "./tags.mjs";
+import { generateMemoryNote } from "../lib/memory.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -331,6 +332,33 @@ async function main() {
 
       enrichedCount++;
       console.log(`[ENRICHED] @${cleanHandle} (${topRepos.length} repos, ${tags.length} tags)`);
+
+      // Ingest-time memory pass (PLAN_7): best-effort, grounded in Atlas Vector Search
+      try {
+        const memoryNote = await generateMemoryNote({
+          handle: cleanHandle,
+          name: doc.name || cleanHandle,
+          description: doc.description || "",
+          tags,
+          text,
+        });
+
+        if (memoryNote && typeof memoryNote === "string") {
+          await peopleCol.updateOne(
+            { _id: docId },
+            {
+              $set: {
+                memoryNote,
+                text: `${text} ${memoryNote}`,
+                updatedAt: new Date(),
+              },
+            }
+          );
+          console.log(`  └─ [MEMORY-NOTE] @${cleanHandle}: "${memoryNote.slice(0, 75)}..."`);
+        }
+      } catch (memErr) {
+        // Ingest memory pass is non-blocking and never halts enrichment
+      }
     } catch (fetchErr) {
       transientSkipCount++;
       console.log(`[TRANSIENT-SKIP] @${cleanHandle}: Network/timeout error (${fetchErr.message})`);
