@@ -58,6 +58,7 @@ interface ExploreData {
 }
 
 const SAMPLE_CHIPS = [
+  "langchain-ai/langgraph",
   "shangmin-chen/mongomatch",
   "hwchase17/langchain",
   "shadcn/ui",
@@ -68,7 +69,7 @@ const SAMPLE_CHIPS = [
 ];
 
 export default function ExplorePage() {
-  const [handleInput, setHandleInput] = useState("shangmin-chen/mongomatch");
+  const [handleInput, setHandleInput] = useState("langchain-ai/langgraph");
   const [loading, setLoading] = useState(false);
   const [exploreData, setExploreData] = useState<ExploreData | null>(heroFallbackData as ExploreData);
   const [error, setError] = useState<string | null>(null);
@@ -117,8 +118,18 @@ export default function ExplorePage() {
 
   // Initial load on mount
   useEffect(() => {
-    loadGraph("shangmin-chen/mongomatch");
+    let initialHandle = "langchain-ai/langgraph";
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const urlHandle = params.get("handle");
+      if (urlHandle && urlHandle.trim()) {
+        initialHandle = urlHandle.trim();
+        setHandleInput(initialHandle);
+      }
+    }
+    loadGraph(initialHandle);
   }, []);
+
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
