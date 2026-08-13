@@ -2,12 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import { findMatches } from "@/lib/match.js";
 import { draftStageIntro } from "@/lib/narrate.js";
+import heroFallbackData from "@/lib/hero-fallback.json";
 
-export async function POST(req: NextRequest) {
+async function getExploreResponse(requestedHandle?: string | null) {
   try {
-    const body = await req.json().catch(() => ({}));
-    const rawHandle = body.handle || "mongodbtesthelix";
-
     const db = await getDb();
     const peopleCol = db.collection("people");
 
@@ -26,23 +24,37 @@ export async function POST(req: NextRequest) {
       })
       .toArray();
 
-    // 2. Compute matches for the active target
-    const { target, matches, degraded: matchDegraded } = await findMatches(rawHandle, { limit: 8 });
+    const cleanHandle = (requestedHandle || "").trim().toLowerCase();
 
-    if (!target) {
-      return NextResponse.json({
-        allPeople: allPeopleDocs,
-        target: null,
-        candidates: [],
-        chosenHandle: null,
-        narration: `Attendee '@${rawHandle}' not found in the graph.`,
-        degraded: false,
-      });
+    // 2. Compute matches for requested target or first available attendee
+    let targetDoc: any = null;
+    let matchResult: any = { target: null, matches: [], degraded: false };
+
+    if (cleanHandle) {
+      matchResult = await findMatches(cleanHandle, { limit: 8 });
+      targetDoc = matchResult.target;
     }
 
+    // If requested handle not found, default to first enriched attendee
+    if (!targetDoc && allPeopleDocs.length > 0) {
+      const fallbackHandle = allPeopleDocs[0].handle;
+      matchResult = await findMatches(fallbackHandle, { limit: 8 });
+      targetDoc = matchResult.target;
+    }
+
+    // If database has no attendees or matching failed, return hero fallback
+    if (!targetDoc) {
+      return {
+        allPeople: allPeopleDocs.length > 0 ? allPeopleDocs : [heroFallbackData.target, ...heroFallbackData.candidates],
+        ...heroFallbackData,
+        degraded: true,
+      };
+    }
+
+    const { target, matches, degraded: matchDegraded } = matchResult;
     const intro = await draftStageIntro(target, matches);
 
-    return NextResponse.json({
+    return {
       allPeople: allPeopleDocs,
       target: {
         handle: target.handle,
@@ -51,63 +63,31 @@ export async function POST(req: NextRequest) {
         tags: target.tags || [],
       },
       candidates: matches,
-      chosenHandle: intro.chosenHandle,
-      narration: intro.narration,
-      degraded: matchDegraded || intro.degraded,
-    });
+      chosenHandle: intro?.chosenHandle || matches[0]?.handle || target.handle,
+      narration: intro?.narration || `Showing top unblocking connections for @${target.handle}.`,
+      degraded: matchDegraded || (intro?.degraded ?? false),
+    };
   } catch (err: any) {
-    console.error("[api/explore] Error processing explore request:", err);
-    return NextResponse.json({ error: err?.message || "Internal server error" }, { status: 500 });
+    console.error("[api/explore] Error connecting to database, returning hero fallback:", err);
+    return {
+      allPeople: [heroFallbackData.target, ...heroFallbackData.candidates],
+      ...heroFallbackData,
+      degraded: true,
+    };
   }
+}
+
+export async function POST(req: NextRequest) {
+  const body = await req.json().catch(() => ({}));
+  const rawHandle = body.handle || null;
+  const result = await getExploreResponse(rawHandle);
+  return NextResponse.json(result);
 }
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const handle = searchParams.get("handle") || "mongodbtesthelix";
-
-  const db = await getDb();
-  const peopleCol = db.collection("people");
-
-  const allPeopleDocs = await peopleCol
-    .find({ enriched: true })
-    .project({
-      _id: 0,
-      handle: 1,
-      name: 1,
-      description: 1,
-      tags: 1,
-      email: 1,
-      repos: 1,
-      githubUrl: 1,
-    })
-    .toArray();
-
-  const { target, matches, degraded: matchDegraded } = await findMatches(handle, { limit: 8 });
-
-  if (!target) {
-    return NextResponse.json({
-      allPeople: allPeopleDocs,
-      target: null,
-      candidates: [],
-      chosenHandle: null,
-      narration: `Attendee '@${handle}' not found.`,
-      degraded: false,
-    });
-  }
-
-  const intro = await draftStageIntro(target, matches);
-
-  return NextResponse.json({
-    allPeople: allPeopleDocs,
-    target: {
-      handle: target.handle,
-      name: target.name || target.handle,
-      description: target.description || "",
-      tags: target.tags || [],
-    },
-    candidates: matches,
-    chosenHandle: intro.chosenHandle,
-    narration: intro.narration,
-    degraded: matchDegraded || intro.degraded,
-  });
+  const handle = searchParams.get("handle") || null;
+  const result = await getExploreResponse(handle);
+  return NextResponse.json(result);
 }
+

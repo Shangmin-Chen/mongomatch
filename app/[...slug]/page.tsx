@@ -2,6 +2,7 @@
 
 import { useEffect, useState, use } from "react";
 import Link from "next/link";
+import { useParams } from "next/navigation";
 import {
   ExternalLink,
   Code,
@@ -71,13 +72,26 @@ interface PersonDoc {
 }
 
 export default function AttendeeDetailPage({
-  params,
+  params: paramsProp,
 }: {
-  params: Promise<{ slug: string[] }>;
+  params?: Promise<{ slug: string[] }> | { slug: string[] };
 }) {
-  const resolvedParams = use(params);
-  const slug = resolvedParams.slug || [];
+  const nextParams = useParams();
+  let slug: string[] = [];
+
+  if (nextParams?.slug) {
+    slug = Array.isArray(nextParams.slug) ? nextParams.slug : [nextParams.slug];
+  } else if (paramsProp) {
+    try {
+      const p = (paramsProp && typeof (paramsProp as any).then === "function") ? use(paramsProp as Promise<{ slug: string[] }>) : (paramsProp as { slug: string[] });
+      slug = p?.slug || [];
+    } catch {
+      slug = [];
+    }
+  }
+
   const pathString = slug.join("/");
+
 
   const [person, setPerson] = useState<PersonDoc | null>(null);
   const [position, setPosition] = useState<number | null>(null);

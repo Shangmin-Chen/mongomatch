@@ -58,16 +58,17 @@ interface ExploreData {
 }
 
 const SAMPLE_CHIPS = [
-  "mongodbtesthelix",
-  "mongodbtestollama",
-  "mongodbtestpgvector",
-  "mongodbtestripgrep",
+  "shangmin-chen/mongomatch",
   "hwchase17/langchain",
+  "shadcn/ui",
+  "redis/redis",
+  "tokio-rs/tokio",
+  "qdrant/qdrant",
   "offline",
 ];
 
 export default function ExplorePage() {
-  const [handleInput, setHandleInput] = useState("mongodbtesthelix");
+  const [handleInput, setHandleInput] = useState("shangmin-chen/mongomatch");
   const [loading, setLoading] = useState(false);
   const [exploreData, setExploreData] = useState<ExploreData | null>(heroFallbackData as ExploreData);
   const [error, setError] = useState<string | null>(null);
@@ -79,6 +80,7 @@ export default function ExplorePage() {
     // Break-glass offline demo trigger: bypasses fetch entirely
     if (clean === "offline" || clean === "demo") {
       setExploreData(heroFallbackData as ExploreData);
+      setHandleInput("mongodbtesthelix");
       setError(null);
       return;
     }
@@ -99,7 +101,11 @@ export default function ExplorePage() {
       }
 
       const data: ExploreData = await res.json();
-      setExploreData(data);
+      if (data && data.target) {
+        setExploreData(data);
+      } else {
+        setExploreData(heroFallbackData as ExploreData);
+      }
     } catch (err: any) {
       console.error("Explore fetch error, loading offline hero fallback:", err);
       setExploreData(heroFallbackData as ExploreData);
@@ -111,7 +117,7 @@ export default function ExplorePage() {
 
   // Initial load on mount
   useEffect(() => {
-    loadGraph("mongodbtesthelix");
+    loadGraph("shangmin-chen/mongomatch");
   }, []);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
@@ -124,9 +130,9 @@ export default function ExplorePage() {
     loadGraph(selectedHandle);
   };
 
-  const chosenCandidate = exploreData?.candidates.find(
-    (c) => c.handle.toLowerCase() === exploreData?.chosenHandle?.toLowerCase()
-  ) || exploreData?.candidates[0];
+  const chosenCandidate = exploreData?.candidates?.find(
+    (c) => c?.handle?.toLowerCase() === exploreData?.chosenHandle?.toLowerCase()
+  ) || exploreData?.candidates?.[0];
 
   return (
     <div
@@ -144,7 +150,7 @@ export default function ExplorePage() {
           <KnowledgeGraph
             allPeople={exploreData.allPeople}
             target={exploreData.target}
-            candidates={exploreData.candidates}
+            candidates={exploreData.candidates || []}
             chosenHandle={exploreData.chosenHandle}
             onSelectHandle={handleSelectNode}
             height="100%"
@@ -211,7 +217,7 @@ export default function ExplorePage() {
           >
             <input
               type="text"
-              placeholder="Traverse handle (e.g. mongodbtesthelix)..."
+              placeholder="Traverse handle (e.g. shangmin-chen/mongomatch)..."
               value={handleInput}
               onChange={(e) => setHandleInput(e.target.value)}
               style={{
@@ -298,7 +304,7 @@ export default function ExplorePage() {
       )}
 
       {/* BOTTOM NARRATION OVERLAY */}
-      {exploreData && (
+      {exploreData && exploreData.target && (
         <div
           style={{
             position: "absolute",
@@ -348,7 +354,7 @@ export default function ExplorePage() {
                     gap: "0.3rem",
                   }}
                 >
-                  <User size={14} color="#00ed64" /> {chosenCandidate.name} (@{chosenCandidate.handle})
+                  <User size={14} color="#00ed64" /> {chosenCandidate.name || chosenCandidate.handle} (@{chosenCandidate.handle})
                 </Link>
               )}
             </div>
@@ -381,7 +387,7 @@ export default function ExplorePage() {
           {/* Candidate overview count */}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "0.75rem", fontSize: "0.75rem", color: "#64748b", borderTop: "1px solid #1e293b", paddingTop: "0.5rem" }}>
             <span>
-              Target: <strong style={{ color: "#00ed64" }}>@{exploreData.target?.handle}</strong> &middot; Evaluated {exploreData.candidates.length} unblockers
+              Target: <strong style={{ color: "#00ed64" }}>@{exploreData.target?.handle || "attendee"}</strong> &middot; Evaluated {(exploreData.candidates || []).length} unblockers
             </span>
             <span style={{ color: "#00ed64", fontWeight: 600 }}>✦ Click any node card to traverse</span>
           </div>
@@ -390,3 +396,4 @@ export default function ExplorePage() {
     </div>
   );
 }
+

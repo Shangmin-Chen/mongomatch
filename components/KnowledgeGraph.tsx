@@ -370,24 +370,28 @@ function computePersistentLayout(allPeople: any[]) {
   const edgeList: Array<{ id: string; source: string; target: string }> = [];
   const tagSet = new Set<string>();
 
-  // Add all people
-  allPeople.forEach((p) => {
-    nodeMap.set(p.handle, {
-      id: p.handle,
+  (allPeople || []).forEach((p, idx) => {
+    if (!p || !p.handle) return;
+    const handleKey = p.handle;
+
+    nodeMap.set(handleKey, {
+      id: handleKey,
       type: "personNode",
       data: {
-        handle: p.handle,
-        name: p.name || p.handle,
+        handle: handleKey,
+        name: p.name || handleKey,
         description: p.description || "",
-        tags: p.tags || [],
+        tags: p.tags || p.sharedTags || [],
         email: p.email || "",
       },
     });
 
-    dagreGraph.setNode(p.handle, { width: 230, height: 110 });
+    dagreGraph.setNode(handleKey, { width: 230, height: 110 });
 
     // Add tags for this person
-    (p.tags || []).slice(0, 3).forEach((tag: string) => {
+    const tags = Array.isArray(p.tags) && p.tags.length > 0 ? p.tags : Array.isArray(p.sharedTags) ? p.sharedTags : [];
+    tags.slice(0, 3).forEach((tag: string) => {
+      if (!tag) return;
       const tagId = `tag:${tag}`;
       if (!tagSet.has(tagId)) {
         tagSet.add(tagId);
@@ -399,18 +403,23 @@ function computePersistentLayout(allPeople: any[]) {
         dagreGraph.setNode(tagId, { width: 140, height: 40 });
       }
 
-      const edgeId = `edge-${p.handle}-${tagId}`;
-      edgeList.push({ id: edgeId, source: p.handle, target: tagId });
-      dagreGraph.setEdge(p.handle, tagId);
+      const edgeId = `edge-${handleKey}-${tagId}`;
+      edgeList.push({ id: edgeId, source: handleKey, target: tagId });
+      dagreGraph.setEdge(handleKey, tagId);
     });
   });
 
-  dagre.layout(dagreGraph);
+  try {
+    dagre.layout(dagreGraph);
+  } catch (err) {
+    console.warn("Dagre layout warning:", err);
+  }
 
   const positionMap = new Map<string, { x: number; y: number }>();
+  let fallbackIdx = 0;
   nodeMap.forEach((node, id) => {
     const dagreNode = dagreGraph.node(id);
-    if (dagreNode) {
+    if (dagreNode && typeof dagreNode.x === "number" && typeof dagreNode.y === "number") {
       const isTag = node.type === "tagNode";
       const w = isTag ? 140 : 230;
       const h = isTag ? 40 : 110;
@@ -418,6 +427,12 @@ function computePersistentLayout(allPeople: any[]) {
         x: dagreNode.x - w / 2,
         y: dagreNode.y - h / 2,
       });
+    } else {
+      positionMap.set(id, {
+        x: (fallbackIdx % 3) * 300,
+        y: Math.floor(fallbackIdx / 3) * 150,
+      });
+      fallbackIdx++;
     }
   });
 
@@ -465,9 +480,9 @@ function FlowGraphInner({
 
   // 1. Build or cache unified graph layout
   const peoplePool = useMemo(() => {
-    if (allPeople.length > 0) return allPeople;
+    if (allPeople && allPeople.length > 0) return allPeople;
     // Fallback: merge target and candidates
-    const pool = [target, ...candidates];
+    const pool = [target, ...(candidates || [])].filter(Boolean);
     const unique = new Map<string, any>();
     pool.forEach((p) => p?.handle && unique.set(p.handle.toLowerCase(), p));
     return Array.from(unique.values());
@@ -477,15 +492,25 @@ function FlowGraphInner({
     return computePersistentLayout(peoplePool);
   }, [peoplePool]);
 
+  // Helper for case-insensitive position lookup
+  const getPos = (id?: string) => {
+    if (!id) return { x: 0, y: 0 };
+    if (positionMap.has(id)) return positionMap.get(id)!;
+    for (const [k, v] of positionMap.entries()) {
+      if (k.toLowerCase() === id.toLowerCase()) return v;
+    }
+    return { x: 0, y: 0 };
+  };
+
   // 2. Compute Active Highlighting State
   const { nodes: computedNodes, edges: computedEdges } = useMemo(() => {
-    const activeTargetHandle = target?.handle?.toLowerCase();
-    const activeChosenHandle = (chosenHandle || candidates[0]?.handle || "").toLowerCase();
+    const activeTargetHandle = (target?.handle || "").toLowerCase();
+    const activeChosenHandle = (chosenHandle || candidates?.[0]?.handle || "").toLowerCase();
 
-    const candidateHandles = new Set(candidates.map((c) => c.handle.toLowerCase()));
-    const chosenCandidate = candidates.find(
-      (c) => c.handle.toLowerCase() === activeChosenHandle
-    ) || candidates[0];
+    const candidateHandles = new Set((candidates || []).map((c) => (c.handle || "").toLowerCase()).filter(Boolean));
+    const chosenCandidate = (candidates || []).find(
+      (c) => (c.handle || "").toLowerCase() === activeChosenHandle
+    ) || candidates?.[0];
 
     const activeSharedTags = new Set(
       (chosenCandidate?.sharedTags || []).map((t) => `tag:${t}`)
@@ -499,17 +524,18 @@ function FlowGraphInner({
 
     // Construct Persistent Nodes with Dynamic Highlight Styles
     nodeMap.forEach((baseNode, id) => {
-      const pos = positionMap.get(id) || { x: 0, y: 0 };
-      const isTarget = id.toLowerCase() === activeTargetHandle;
-      const isChosen = id.toLowerCase() === activeChosenHandle;
-      const isCandidate = candidateHandles.has(id.toLowerCase());
+      const pos = getPos(id);
+      const idLower = id.toLowerCase();
+      const isTarget = idLower === activeTargetHandle;
+      const isChosen = idLower === activeChosenHandle;
+      const isCandidate = candidateHandles.has(idLower);
       const isTag = baseNode.type === "tagNode";
       const isChosenTag = isTag && activeSharedTags.has(id);
 
       const isHighlight = isTarget || isChosen || isChosenTag;
       const isDimmed = !isHighlight && !isCandidate;
 
-      const candidateDoc = candidates.find((c) => c.handle.toLowerCase() === id.toLowerCase());
+      const candidateDoc = (candidates || []).find((c) => (c.handle || "").toLowerCase() === idLower);
 
       rawNodes.push({
         id,
@@ -527,9 +553,9 @@ function FlowGraphInner({
     });
 
     // Add Evidence Repo Node dynamically next to Chosen Match
-    if (chosenCandidate?.evidenceRepo) {
+    if (chosenCandidate?.evidenceRepo && chosenCandidate?.handle) {
       const repoId = `repo:${chosenCandidate.evidenceRepo.name}`;
-      const chosenPos = positionMap.get(chosenCandidate.handle) || { x: 400, y: 0 };
+      const chosenPos = getPos(chosenCandidate.handle);
       const repoPos = { x: chosenPos.x + 280, y: chosenPos.y };
 
       rawNodes.push({
@@ -563,9 +589,10 @@ function FlowGraphInner({
 
     // Construct Persistent Edges with Dynamic Glowing Flow
     edgeList.forEach((e) => {
-      const sourceIsTarget = e.source.toLowerCase() === activeTargetHandle;
-      const targetIsActiveTag = activeSharedTags.has(e.target);
-      const isChosenPath = (sourceIsTarget && targetIsActiveTag) || (targetIsActiveTag && e.target.toLowerCase() === activeChosenHandle);
+      const sourceLower = (e.source || "").toLowerCase();
+      const isTargetEdge = sourceLower === activeTargetHandle && activeSharedTags.has(e.target);
+      const isChosenEdge = sourceLower === activeChosenHandle && activeSharedTags.has(e.target);
+      const isChosenPath = isTargetEdge || isChosenEdge;
 
       rawEdges.push({
         id: e.id,
@@ -597,7 +624,7 @@ function FlowGraphInner({
   // Smoothly center on the active target when target changes WITHOUT re-layouting
   useEffect(() => {
     if (target?.handle) {
-      const targetPos = positionMap.get(target.handle);
+      const targetPos = getPos(target.handle);
       if (targetPos) {
         setCenter(targetPos.x + 100, targetPos.y + 50, { duration: 600, zoom: 0.95 });
       }
