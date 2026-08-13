@@ -14,6 +14,8 @@ import {
   Cpu,
 } from "lucide-react";
 
+import heroFallbackData from "@/lib/hero-fallback.json";
+
 // Dynamically import 3D Force Graph to avoid SSR WebGL issues
 const ForceGraph3D = dynamic(() => import("react-force-graph-3d"), { ssr: false });
 
@@ -53,13 +55,13 @@ const SAMPLE_CHIPS = [
   "mongodbtestollama",
   "mongodbtestpgvector",
   "mongodbtestripgrep",
-  "hwchase17/langchain",
+  "offline",
 ];
 
 export default function ExplorePage() {
   const [handleInput, setHandleInput] = useState("mongodbtesthelix");
   const [loading, setLoading] = useState(false);
-  const [exploreData, setExploreData] = useState<ExploreData | null>(null);
+  const [exploreData, setExploreData] = useState<ExploreData | null>(heroFallbackData as ExploreData);
   const [error, setError] = useState<string | null>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
   const graphRef = useRef<any>(null);
@@ -78,6 +80,15 @@ export default function ExplorePage() {
 
   const loadGraph = async (handle: string) => {
     if (!handle.trim()) return;
+    const clean = handle.trim().toLowerCase();
+
+    // Break-glass offline demo trigger: bypasses fetch entirely
+    if (clean === "offline" || clean === "demo") {
+      setExploreData(heroFallbackData as ExploreData);
+      setError(null);
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -85,7 +96,7 @@ export default function ExplorePage() {
       const res = await fetch("/api/explore", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ handle: handle.trim() }),
+        body: JSON.stringify({ handle: clean }),
       });
 
       if (!res.ok) {
@@ -96,8 +107,10 @@ export default function ExplorePage() {
       const data: ExploreData = await res.json();
       setExploreData(data);
     } catch (err: any) {
-      console.error("Explore fetch error:", err);
-      setError(err?.message || "Failed to load graph for attendee.");
+      console.error("Explore fetch error, loading offline hero fallback:", err);
+      // If network fails completely at demo time, gracefully fallback to hero data
+      setExploreData(heroFallbackData as ExploreData);
+      setError(null);
     } finally {
       setLoading(false);
     }

@@ -1,0 +1,522 @@
+{
+  "target": {
+    "handle": "mongodbtesthelix",
+    "name": "Test: helix",
+    "description": "Core contributor to a modal text editor written in Rust. Want to pair with someone experienced in tree-sitter grammar authoring.",
+    "tags": [
+      "lang:rust",
+      "stack:rust",
+      "topic:kakoune",
+      "topic:texteditor",
+      "topic:vim"
+    ]
+  },
+  "candidates": [
+    {
+      "handle": "mongodbtestzellij",
+      "name": "Test: zellij",
+      "email": "mongodbtest+zellij@example.com",
+      "github": "zellij-org/zellij",
+      "githubUrl": "https://github.com/zellij-org/zellij",
+      "description": "Building a terminal workspace/multiplexer in Rust. Looking for someone who's dealt with tricky terminal escape-sequence edge cases.",
+      "sharedTags": [
+        "lang:rust",
+        "stack:rust"
+      ],
+      "reason": "stack:rust",
+      "evidenceRepo": {
+        "name": "zellij",
+        "url": "https://github.com/zellij-org/zellij",
+        "description": "A terminal workspace with batteries included",
+        "language": "Rust",
+        "topics": [
+          "multiplexer",
+          "terminal",
+          "workspace"
+        ],
+        "stars": 34878,
+        "pushedAt": "2026-08-13T08:19:13Z"
+      },
+      "path": [
+        {
+          "type": "person",
+          "label": "@mongodbtesthelix",
+          "name": "Test: helix"
+        },
+        {
+          "type": "tag",
+          "label": "stack:rust",
+          "namespace": "stack",
+          "value": "rust"
+        },
+        {
+          "type": "repo",
+          "label": "zellij",
+          "url": "https://github.com/zellij-org/zellij"
+        },
+        {
+          "type": "match",
+          "label": "@mongodbtestzellij",
+          "name": "Test: zellij",
+          "email": "mongodbtest+zellij@example.com"
+        }
+      ],
+      "score": 22.28,
+      "breakdown": {
+        "totalScore": 22.28,
+        "directTagScore": 7.7,
+        "secondHopScore": 0.9,
+        "vectorContribution": 13.68,
+        "rawVectorScore": 0.855
+      }
+    },
+    {
+      "handle": "mongodbtestjust",
+      "name": "Test: just",
+      "email": "mongodbtest+just@example.com",
+      "github": "casey/just",
+      "githubUrl": "https://github.com/casey/just",
+      "description": "Maintaining a command runner written in Rust. Stuck on getting recipe dependency graphs to resolve cleanly for complex Justfiles.",
+      "sharedTags": [
+        "lang:rust",
+        "stack:rust"
+      ],
+      "reason": "stack:rust",
+      "evidenceRepo": {
+        "name": "just",
+        "url": "https://github.com/casey/just",
+        "description": "🤖 Just a command runner",
+        "language": "Rust",
+        "topics": [],
+        "stars": 35292,
+        "pushedAt": "2026-08-12T23:47:50Z"
+      },
+      "path": [
+        {
+          "type": "person",
+          "label": "@mongodbtesthelix",
+          "name": "Test: helix"
+        },
+        {
+          "type": "tag",
+          "label": "stack:rust",
+          "namespace": "stack",
+          "value": "rust"
+        },
+        {
+          "type": "repo",
+          "label": "just",
+          "url": "https://github.com/casey/just"
+        },
+        {
+          "type": "match",
+          "label": "@mongodbtestjust",
+          "name": "Test: just",
+          "email": "mongodbtest+just@example.com"
+        }
+      ],
+      "score": 21.69,
+      "breakdown": {
+        "totalScore": 21.69,
+        "directTagScore": 7.7,
+        "secondHopScore": 0.9,
+        "vectorContribution": 13.09,
+        "rawVectorScore": 0.8179
+      }
+    },
+    {
+      "handle": "mongodbtestripgrep",
+      "name": "Test: ripgrep",
+      "email": "mongodbtest+ripgrep@example.com",
+      "github": "BurntSushi/ripgrep",
+      "githubUrl": "https://github.com/BurntSushi/ripgrep",
+      "description": "Maintaining a line-oriented recursive search tool in Rust. Stuck optimizing regex engine throughput on pathological patterns.",
+      "sharedTags": [
+        "lang:rust",
+        "stack:rust"
+      ],
+      "reason": "stack:rust",
+      "evidenceRepo": {
+        "name": "ripgrep",
+        "url": "https://github.com/BurntSushi/ripgrep",
+        "description": "ripgrep recursively searches directories for a regex pattern while respecting your gitignore",
+        "language": "Rust",
+        "topics": [
+          "cli",
+          "command-line",
+          "command-line-tool",
+          "gitignore",
+          "grep",
+          "recursively-search",
+          "regex",
+          "ripgrep",
+          "rust",
+          "search"
+        ],
+        "stars": 67306,
+        "pushedAt": "2026-08-04T13:59:44Z"
+      },
+      "path": [
+        {
+          "type": "person",
+          "label": "@mongodbtesthelix",
+          "name": "Test: helix"
+        },
+        {
+          "type": "tag",
+          "label": "stack:rust",
+          "namespace": "stack",
+          "value": "rust"
+        },
+        {
+          "type": "repo",
+          "label": "ripgrep",
+          "url": "https://github.com/BurntSushi/ripgrep"
+        },
+        {
+          "type": "match",
+          "label": "@mongodbtestripgrep",
+          "name": "Test: ripgrep",
+          "email": "mongodbtest+ripgrep@example.com"
+        }
+      ],
+      "score": 21.29,
+      "breakdown": {
+        "totalScore": 21.29,
+        "directTagScore": 7.7,
+        "secondHopScore": 0.9,
+        "vectorContribution": 12.69,
+        "rawVectorScore": 0.7928
+      }
+    },
+    {
+      "handle": "mongodbtestfd",
+      "name": "Test: fd",
+      "email": "mongodbtest+fd@example.com",
+      "github": "sharkdp/fd",
+      "githubUrl": "https://github.com/sharkdp/fd",
+      "description": "Working on a fast alternative to find, written in Rust. Need help profiling filesystem walk performance on network drives.",
+      "sharedTags": [
+        "lang:rust",
+        "stack:rust"
+      ],
+      "reason": "stack:rust",
+      "evidenceRepo": {
+        "name": "fd",
+        "url": "https://github.com/sharkdp/fd",
+        "description": "A simple, fast and user-friendly alternative to 'find'",
+        "language": "Rust",
+        "topics": [
+          "cli",
+          "command-line",
+          "filesystem",
+          "hacktoberfest",
+          "regex",
+          "rust",
+          "search",
+          "terminal",
+          "tool"
+        ],
+        "stars": 44074,
+        "pushedAt": "2026-08-11T17:42:55Z"
+      },
+      "path": [
+        {
+          "type": "person",
+          "label": "@mongodbtesthelix",
+          "name": "Test: helix"
+        },
+        {
+          "type": "tag",
+          "label": "stack:rust",
+          "namespace": "stack",
+          "value": "rust"
+        },
+        {
+          "type": "repo",
+          "label": "fd",
+          "url": "https://github.com/sharkdp/fd"
+        },
+        {
+          "type": "match",
+          "label": "@mongodbtestfd",
+          "name": "Test: fd",
+          "email": "mongodbtest+fd@example.com"
+        }
+      ],
+      "score": 20.9,
+      "breakdown": {
+        "totalScore": 20.9,
+        "directTagScore": 7.7,
+        "secondHopScore": 0.9,
+        "vectorContribution": 12.29,
+        "rawVectorScore": 0.7682
+      }
+    },
+    {
+      "handle": "mongodbtestbubbletea",
+      "name": "Test: bubbletea",
+      "email": "mongodbtest+bubbletea@example.com",
+      "github": "charmbracelet/bubbletea",
+      "githubUrl": "https://github.com/charmbracelet/bubbletea",
+      "description": "Maintaining a Go framework for building terminal user interfaces with the Elm architecture. Debugging flaky state updates under rapid input.",
+      "sharedTags": [],
+      "reason": "lang:go",
+      "evidenceRepo": {
+        "name": "bubbletea",
+        "url": "https://github.com/charmbracelet/bubbletea",
+        "description": "A powerful little TUI framework 🏗",
+        "language": "Go",
+        "topics": [
+          "cli",
+          "elm-architecture",
+          "framework",
+          "functional",
+          "go",
+          "golang",
+          "hacktoberfest",
+          "tui"
+        ],
+        "stars": 44349,
+        "pushedAt": "2026-08-12T20:40:50Z"
+      },
+      "path": [
+        {
+          "type": "person",
+          "label": "@mongodbtesthelix",
+          "name": "Test: helix"
+        },
+        {
+          "type": "tag",
+          "label": "lang:go",
+          "namespace": "lang",
+          "value": "go"
+        },
+        {
+          "type": "repo",
+          "label": "bubbletea",
+          "url": "https://github.com/charmbracelet/bubbletea"
+        },
+        {
+          "type": "match",
+          "label": "@mongodbtestbubbletea",
+          "name": "Test: bubbletea",
+          "email": "mongodbtest+bubbletea@example.com"
+        }
+      ],
+      "score": 13.79,
+      "breakdown": {
+        "totalScore": 13.79,
+        "directTagScore": 0,
+        "secondHopScore": 1.2,
+        "vectorContribution": 12.59,
+        "rawVectorScore": 0.7872
+      }
+    },
+    {
+      "handle": "mongodbtestollama",
+      "name": "Test: ollama",
+      "email": "mongodbtest+ollama@example.com",
+      "github": "ollama/ollama",
+      "githubUrl": "https://github.com/ollama/ollama",
+      "description": "Running local LLM inference tooling in Go. Trying to figure out the best approach for quantized model memory management on constrained hardware.",
+      "sharedTags": [],
+      "reason": "ai:inference",
+      "evidenceRepo": {
+        "name": "ollama",
+        "url": "https://github.com/ollama/ollama",
+        "description": "Get up and running with Kimi-K2.6, GLM-5.2, MiniMax, DeepSeek, gpt-oss, Qwen, Gemma and other models.",
+        "language": "Go",
+        "topics": [
+          "deepseek",
+          "gemma",
+          "gemma3",
+          "glm",
+          "go",
+          "golang",
+          "gpt-oss",
+          "llama",
+          "llama3",
+          "llm",
+          "llms",
+          "minimax",
+          "mistral",
+          "ollama",
+          "qwen"
+        ],
+        "stars": 178476,
+        "pushedAt": "2026-08-13T22:38:02Z"
+      },
+      "path": [
+        {
+          "type": "person",
+          "label": "@mongodbtesthelix",
+          "name": "Test: helix"
+        },
+        {
+          "type": "tag",
+          "label": "ai:inference",
+          "namespace": "ai",
+          "value": "inference"
+        },
+        {
+          "type": "repo",
+          "label": "ollama",
+          "url": "https://github.com/ollama/ollama"
+        },
+        {
+          "type": "match",
+          "label": "@mongodbtestollama",
+          "name": "Test: ollama",
+          "email": "mongodbtest+ollama@example.com"
+        }
+      ],
+      "score": 11.7,
+      "breakdown": {
+        "totalScore": 11.7,
+        "directTagScore": 0,
+        "secondHopScore": 0.6,
+        "vectorContribution": 11.1,
+        "rawVectorScore": 0.6938
+      }
+    },
+    {
+      "handle": "shadcn/ui",
+      "name": "Shadcn",
+      "email": "shadcn@ui.dev",
+      "github": "shadcn/ui",
+      "githubUrl": "https://github.com/shadcn/ui",
+      "description": "Building beautifully designed accessible UI components with React, Tailwind CSS, and Radix Primitives.",
+      "sharedTags": [],
+      "reason": "lang:ts",
+      "evidenceRepo": {
+        "name": "ui",
+        "url": "https://github.com/shadcn-ui/ui",
+        "description": "A set of beautifully-designed, accessible components and a code distribution platform. Works with your favorite frameworks. Open Source. Open Code.",
+        "language": "TypeScript",
+        "topics": [
+          "base-ui",
+          "components",
+          "laravel",
+          "nextjs",
+          "radix-ui",
+          "react",
+          "shadcn",
+          "tailwindcss",
+          "tanstack",
+          "ui",
+          "vite"
+        ],
+        "stars": 121269,
+        "pushedAt": "2026-08-13T18:44:30Z"
+      },
+      "path": [
+        {
+          "type": "person",
+          "label": "@mongodbtesthelix",
+          "name": "Test: helix"
+        },
+        {
+          "type": "tag",
+          "label": "lang:ts",
+          "namespace": "lang",
+          "value": "ts"
+        },
+        {
+          "type": "repo",
+          "label": "ui",
+          "url": "https://github.com/shadcn-ui/ui"
+        },
+        {
+          "type": "match",
+          "label": "@shadcn/ui",
+          "name": "Shadcn",
+          "email": "shadcn@ui.dev"
+        }
+      ],
+      "score": 11.43,
+      "breakdown": {
+        "totalScore": 11.43,
+        "directTagScore": 0,
+        "secondHopScore": 0,
+        "vectorContribution": 11.43,
+        "rawVectorScore": 0.7146
+      }
+    },
+    {
+      "handle": "hwchase17/langchain",
+      "name": "Harrison Chase",
+      "email": "harrison@langchain.dev",
+      "github": "hwchase17/langchain",
+      "githubUrl": "https://github.com/hwchase17/langchain",
+      "description": "Building autonomous agents, LLM orchestration, RAG retrieval pipelines, and model context protocol.",
+      "sharedTags": [],
+      "reason": "ai:agents",
+      "evidenceRepo": {
+        "name": "langchain",
+        "url": "https://github.com/langchain-ai/langchain",
+        "description": "The agent engineering platform.",
+        "language": "Python",
+        "topics": [
+          "agents",
+          "ai",
+          "ai-agents",
+          "anthropic",
+          "chatgpt",
+          "deepagents",
+          "enterprise",
+          "framework",
+          "gemini",
+          "generative-ai",
+          "langchain",
+          "langgraph",
+          "llm",
+          "multiagent",
+          "open-source",
+          "openai",
+          "pydantic",
+          "python",
+          "rag",
+          "typescript"
+        ],
+        "stars": 144183,
+        "pushedAt": "2026-08-13T21:37:53Z"
+      },
+      "path": [
+        {
+          "type": "person",
+          "label": "@mongodbtesthelix",
+          "name": "Test: helix"
+        },
+        {
+          "type": "tag",
+          "label": "ai:agents",
+          "namespace": "ai",
+          "value": "agents"
+        },
+        {
+          "type": "repo",
+          "label": "langchain",
+          "url": "https://github.com/langchain-ai/langchain"
+        },
+        {
+          "type": "match",
+          "label": "@hwchase17/langchain",
+          "name": "Harrison Chase",
+          "email": "harrison@langchain.dev"
+        }
+      ],
+      "score": 11.36,
+      "breakdown": {
+        "totalScore": 11.36,
+        "directTagScore": 0,
+        "secondHopScore": 0.6,
+        "vectorContribution": 10.76,
+        "rawVectorScore": 0.6725
+      }
+    }
+  ],
+  "chosenHandle": "mongodbtestzellij",
+  "narration": "Ladies and gentlemen, meet Test: zellij, the perfect match for Test: helix! With a powerhouse track record in building high-performance Rust terminal multiplexers, their mastery of low-level escape sequences and syntax systems directly unblocks complex tree-sitter grammar authoring.",
+  "degraded": false
+}
