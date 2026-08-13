@@ -44,7 +44,6 @@ interface CandidateDoc {
 }
 
 interface ExploreData {
-  allPeople?: any[];
   target: {
     handle: string;
     name: string;
@@ -130,15 +129,9 @@ export default function ExplorePage() {
     loadGraph(initialHandle);
   }, []);
 
-
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     loadGraph(handleInput);
-  };
-
-  const handleSelectNode = (selectedHandle: string) => {
-    setHandleInput(selectedHandle);
-    loadGraph(selectedHandle);
   };
 
   const chosenCandidate = exploreData?.candidates?.find(
@@ -159,11 +152,9 @@ export default function ExplorePage() {
       <div style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", zIndex: 1 }}>
         {exploreData && exploreData.target && (
           <KnowledgeGraph
-            allPeople={exploreData.allPeople}
             target={exploreData.target}
             candidates={exploreData.candidates || []}
             chosenHandle={exploreData.chosenHandle}
-            onSelectHandle={handleSelectNode}
             height="100%"
           />
         )}
@@ -228,7 +219,7 @@ export default function ExplorePage() {
           >
             <input
               type="text"
-              placeholder="Traverse handle (e.g. shangmin-chen/mongomatch)..."
+              placeholder="Search handle (e.g. langchain-ai/langgraph)..."
               value={handleInput}
               onChange={(e) => setHandleInput(e.target.value)}
               style={{
@@ -398,9 +389,9 @@ export default function ExplorePage() {
           {/* Candidate overview count */}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "0.75rem", fontSize: "0.75rem", color: "#64748b", borderTop: "1px solid #1e293b", paddingTop: "0.5rem" }}>
             <span>
-              Target: <strong style={{ color: "#00ed64" }}>@{exploreData.target?.handle || "attendee"}</strong> &middot; Evaluated {(exploreData.candidates || []).length} unblockers
+              Target: <strong style={{ color: "#00ed64" }}>@{exploreData.target?.handle || "attendee"}</strong> &middot; Evaluated {(exploreData.candidates || []).length} candidates
             </span>
-            <span style={{ color: "#00ed64", fontWeight: 600 }}>✦ Click any node card to traverse</span>
+            <span style={{ color: "#00ed64", fontWeight: 600 }}>✦ Click any node card to navigate</span>
           </div>
         </div>
       )}

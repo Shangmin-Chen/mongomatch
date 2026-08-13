@@ -1,6 +1,6 @@
 # MongoMatch — Demo Video Guide
 
-Target length: ~2:15–2:30. Screen-record each numbered shot as its own clip
+Target length: ~2:30–2:45. Screen-record each numbered shot as its own clip
 in QuickTime/OBS, record voiceover separately (or live over the screen
 recording), then assemble in CapCut per the notes at the bottom.
 
@@ -58,27 +58,40 @@ targets, not hard cuts — pace to what feels right when you say it out loud.
 > compounding. What it learns from person twelve changes how it matches
 > person thirteen."
 
-**[1:00–1:45] — The Explore graph, over `/explore`, query: `langchain-ai/langgraph`**
-> "This is the live view. I'll ask: who can unblock the LangGraph team? Watch —
-> this ran through Atlas $vectorSearch for semantic similarity, a
-> $graphLookup traversal across shared tags, and ranked the whole candidate
-> pool with an inverse-frequency-weighted score — all inside one aggregation
-> pipeline, no separate vector database, no separate graph database.
-> Out of that ranked pool, one model call — the *only* LLM call in this
-> entire pipeline — picks the strongest match and drafts the introduction
-> live: [let the real narration finish reading on screen, then read it
-> aloud or let it speak for itself on camera]."
+**[1:00–1:25] — "How it's built," over a simple architecture card (see note below)**
+> "Under the hood, this is two things, and only two things. First: MongoDB
+> Atlas. A single document per person holds the raw signup, the cached
+> GitHub data, the derived tags, the vector embedding, and the memory note
+> — one place, no bolt-on vector database, no separate graph database, no
+> ETL pipeline stitching stores together. Atlas Vector Search handles
+> semantic retrieval with automatic embedding built in. `$graphLookup`
+> handles the multi-hop graph traversal across shared tags. Both run as
+> stages in one aggregation pipeline. Second: OpenRouter, running
+> `gpt-4o-mini`. That's the *only* other moving part — and it's used
+> exactly twice in this whole system. Once to synthesize the memory note
+> you just saw, grounded in real retrieved neighbors. And once more, right
+> now, to pick the winning match and narrate it. Every ranking, every
+> score, every piece of retrieval before that — that's deterministic Mongo
+> aggregation. The model never guesses who matches whom. It only narrates
+> what the database already found."
 
-**[1:45–2:05] — Zoom on the graph + tags, still on `/explore`**
-> "Everything you're seeing — the nodes, the highlighted path, the
-> match — came out of a single MongoDB document model: raw signup, cached
-> GitHub data, derived tags, the embedding, and the memory note, all in one
-> place. No bolt-on vector store, no separate cache, no ETL."
+**[1:25–2:05] — The Explore graph, over `/explore`, query: `langchain-ai/langgraph`**
+> "So watch this live. I'll ask: who can unblock the LangGraph team? That
+> query just ran `$vectorSearch` for semantic similarity, `$graphLookup`
+> for the graph traversal, and a weighted ranking pass — all in Atlas.
+> Then OpenRouter took the ranked candidates and drafted this: [let the
+> real narration finish reading on screen, then read it aloud or let it
+> speak for itself on camera]."
 
-**[2:05–2:25] — Close, over the homepage or a black title card**
-> "That's MongoMatch — an agent that doesn't start cold, because MongoDB
-> Atlas is holding the state, the memory, and the retrieval all in one
-> system. Thanks for watching."
+**[2:05–2:20] — Zoom on the graph + tags, still on `/explore`**
+> "That's a real match, from a real MongoDB pipeline, in real time — not a
+> canned demo response."
+
+**[2:20–2:35] — Close, over the homepage or a black title card**
+> "That's MongoMatch — MongoDB Atlas holding the state, the memory, and the
+> retrieval in one place, and OpenRouter doing exactly the two things a
+> model should do here: synthesize and narrate, never decide. An agent that
+> doesn't start cold. Thanks for watching."
 
 ---
 
@@ -102,7 +115,12 @@ darting.
      readable and not cut off)
    - Scroll to the tags row, pause (~3s)
    - Scroll to the mini graph embed if visible, pause (~3s)
-4. **`/explore`** — the centerpiece:
+4. **Architecture card** — this is the one shot that isn't a screen
+   recording, it's a graphic you build directly in CapCut (see section 3)
+   for the "How it's built" narration. Have it ready before you start
+   editing so you're not blocking on design mid-edit. ~25s held on screen
+   while you narrate over it.
+5. **`/explore`** — the centerpiece:
    - Load the page (~2s)
    - Click into the query box, type `langchain-ai/langgraph` character by
      character (don't paste — typing reads as "live," pasting reads as
@@ -118,20 +136,37 @@ darting.
      supports click-to-navigate, to show it deep-links to that person's
      real profile (~5s) — nice bonus shot, cut it if it doesn't land
      smoothly
-5. **Full narration text on screen** — a clean static shot of just the
-   narration box, held for 4-5s, unobstructed — you'll want this as a shot
-   you can hold under your own voiceover in 1:00–1:45 without mouse
-   movement distracting from it.
-6. **Homepage again** for the closing shot — 5s static, maybe cursor
+6. **Full narration text on screen** — a clean static shot of just the
+   narration box, held for 4-5s, unobstructed.
+7. **Homepage again** for the closing shot — 5s static, maybe cursor
    resting near the "Add Yourself" button as a soft call-to-action visual.
 
-Total raw b-roll: aim for ~90-120 seconds of footage to cut down into the
-~135-150 second final script above — always overshoot.
+Total raw b-roll: aim for ~100-130 seconds of footage (screen recording,
+not counting the architecture card) to cut down into the ~155-165 second
+final script above — always overshoot.
 
 ---
 
 ## 3. Assembling in CapCut
 
+- **The architecture card** (for the "How it's built" beat, ~1:00–1:25):
+  build this as a plain graphic on a black/dark-navy background (match the
+  app's `#0b0f19`), no screen recording needed:
+  - Title line: **"How it's built"**
+  - Two grouped rows, each with a small colored dot or icon (CapCut's
+    built-in shape/sticker tools are enough, don't overdesign this):
+    - 🟢 **MongoDB Atlas** — `Vector Search (auto-embed)` · `$graphLookup`
+      · `single document model`
+    - 🔵 **OpenRouter (`gpt-4o-mini`)** — `2 LLM calls total: memory
+      synthesis + narration`
+  - Keep it on screen the full ~25s of that narration beat — this is the
+    one slide judges will actually pause the video to read, don't rush it
+    or cram more text on than the two rows above.
+  - If you want a lighter lift: skip the custom graphic entirely and just
+    hold on the `/shangmin-chen/mongomatch` profile shot from item 3 again
+    while you narrate this beat, with the two `Text` overlays from below
+    layered on top instead of a dedicated card. Either works — the card is
+    slightly more polished, the reused shot is faster to produce.
 - **Layer order**: screen recording on the bottom video track, voiceover
   (recorded separately, cleaner audio than talking live over screen
   capture) on an audio track, background music on a second audio track
@@ -141,10 +176,13 @@ Total raw b-roll: aim for ~90-120 seconds of footage to cut down into the
   work fine, don't overthink this.
 - **Text overlays**: add short on-screen labels at these three moments
   (CapCut's "Text" → simple sans-serif, white text, subtle drop shadow):
-  - Over the `/explore` shot: **"MongoDB $vectorSearch + $graphLookup — one pipeline"**
-  - Over the memory-note shot: **"One LLM call, grounded in retrieved memory — not a guess"**
+  - Over the memory-note shot (item 3): **"Grounded in retrieved memory — not a guess"**
+  - Over the `/explore` shot: **"MongoDB $vectorSearch + $graphLookup, live"**
   - Over the closing shot: **"github.com/Shangmin-Chen/mongomatch"** (or your
     actual submission link) — give judges something to note down.
+  (The architecture card above already carries the "MongoDB Atlas /
+  OpenRouter, 2 LLM calls total" message — don't repeat that exact line as
+  a second overlay elsewhere, it'll read as redundant.)
 - **Pacing**: cut on the beat of your voiceover, not arbitrarily — a clip
   should hold at least 2-3s minimum so nothing feels like a flash. The
   `/explore` render/narration moment (script section 3) is the one place
