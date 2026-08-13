@@ -67,7 +67,7 @@ export default function IntakeFormPage() {
       }
 
       const targetHandle = data.handle || sanitizedGithub || "attendee";
-      router.push(`/me/${targetHandle}`);
+      router.push(`/${targetHandle}`);
     } catch (err: any) {
       setError(err?.message || "Failed to submit. Please try again.");
       setLoading(false);

@@ -63,7 +63,8 @@ const DB_NAME = process.env.MONGODB_DB_NAME || "mongomatch";
 
 const RESERVED_HANDLES = new Set([
   "settings", "orgs", "features", "about", "pricing", "explore",
-  "marketplace", "sponsors", "login", "join", "new", "notifications"
+  "marketplace", "sponsors", "login", "join", "new", "notifications",
+  "form", "profile", "api"
 ]);
 
 const GITHUB_USERNAME_REGEX = /^[a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38}$/;
