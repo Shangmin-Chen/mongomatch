@@ -53,28 +53,31 @@ export interface KnowledgeGraphProps {
 function PersonNode({ data }: { data: any }) {
   const isYou = data.variant === "you";
   const isChosen = data.variant === "chosen";
-  const accent = isYou || isChosen ? "#00ed64" : "#475569";
+  const isHighlighted = isYou || isChosen;
+  const accent = isHighlighted ? "#00ed64" : "#475569";
 
   return (
     <div
       style={{
-        background: isYou ? "#052210" : isChosen ? "#0a2416" : "#111827",
-        border: `1.5px solid ${accent}`,
+        background: isYou ? "#052210" : isChosen ? "#0a2416" : "#0f172a",
+        border: `${isHighlighted ? 2 : 1}px solid ${accent}`,
         borderRadius: "10px",
-        padding: "0.6rem 0.8rem",
-        minWidth: "170px",
-        maxWidth: "210px",
+        padding: isHighlighted ? "0.75rem 0.95rem" : "0.55rem 0.75rem",
+        minWidth: isHighlighted ? "190px" : "160px",
+        maxWidth: "220px",
         cursor: "pointer",
+        boxShadow: isHighlighted ? "0 0 22px rgba(0, 237, 100, 0.35)" : "none",
+        opacity: isHighlighted ? 1 : 0.55,
       }}
     >
       <Handle type="target" position={Position.Left} style={{ opacity: 0 }} />
       <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginBottom: "0.2rem" }}>
-        <User size={13} color={accent} />
+        <User size={isHighlighted ? 14 : 12} color={accent} />
         <span style={{ fontSize: "0.7rem", fontWeight: 700, color: accent, textTransform: "uppercase", letterSpacing: "0.02em" }}>
           {isYou ? "You" : isChosen ? "Top match" : "Match"}
         </span>
       </div>
-      <div style={{ color: "#f8fafc", fontWeight: 600, fontSize: "0.85rem", lineHeight: 1.25 }}>
+      <div style={{ color: "#f8fafc", fontWeight: 600, fontSize: isHighlighted ? "0.92rem" : "0.82rem", lineHeight: 1.25 }}>
         {data.name}
       </div>
       <div style={{ color: "#64748b", fontSize: "0.72rem", marginTop: "0.1rem" }}>@{data.handle}</div>
@@ -88,13 +91,15 @@ function TagNode({ data }: { data: any }) {
     <div
       style={{
         background: data.isPathTag ? "#064e3b" : "#0f172a",
-        border: `1px solid ${data.isPathTag ? "#00ed64" : "#334155"}`,
+        border: `${data.isPathTag ? 2 : 1}px solid ${data.isPathTag ? "#00ed64" : "#334155"}`,
         borderRadius: "9999px",
-        padding: "0.3rem 0.7rem",
+        padding: data.isPathTag ? "0.4rem 0.85rem" : "0.28rem 0.65rem",
         color: data.isPathTag ? "#a7f3d0" : "#94a3b8",
-        fontSize: "0.72rem",
+        fontSize: data.isPathTag ? "0.78rem" : "0.68rem",
         fontWeight: 600,
         whiteSpace: "nowrap",
+        boxShadow: data.isPathTag ? "0 0 16px rgba(0, 237, 100, 0.3)" : "none",
+        opacity: data.isPathTag ? 1 : 0.5,
       }}
     >
       <Handle type="target" position={Position.Left} style={{ opacity: 0 }} />
@@ -200,7 +205,7 @@ export default function KnowledgeGraph({ target, candidates = [], chosenHandle, 
             source: target.handle,
             target: tagId,
             animated: isPathTag,
-            style: { stroke: isPathTag ? "#00ed64" : "rgba(148,163,184,0.35)", strokeWidth: isPathTag ? 2.5 : 1.25 },
+            style: { stroke: isPathTag ? "#00ed64" : "rgba(148,163,184,0.2)", strokeWidth: isPathTag ? 3 : 1 },
             markerEnd: { type: MarkerType.ArrowClosed, color: isPathTag ? "#00ed64" : "#475569" },
           });
         }
@@ -210,7 +215,7 @@ export default function KnowledgeGraph({ target, candidates = [], chosenHandle, 
           source: tagId,
           target: c.handle,
           animated: isPathTag,
-          style: { stroke: isPathTag ? "#00ed64" : "rgba(148,163,184,0.35)", strokeWidth: isPathTag ? 2.5 : 1.25 },
+          style: { stroke: isPathTag ? "#00ed64" : "rgba(148,163,184,0.2)", strokeWidth: isPathTag ? 3 : 1 },
           markerEnd: { type: MarkerType.ArrowClosed, color: isPathTag ? "#00ed64" : "#475569" },
         });
       });
